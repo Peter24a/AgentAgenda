@@ -1,0 +1,14 @@
+# IDEs y editores
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Entornos y secretos
+.env
+.env.*
+!.env.example
+
+# Logs y temporales
+*.log
+.DS_Store
