@@ -4,6 +4,22 @@
 *.swp
 *.swo
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Bases de datos y datos
+*.db
+*.sqlite
+*.sqlite3
+backend_data/
+
 # Entornos y secretos
 .env
 .env.*
