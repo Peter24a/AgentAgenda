@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/network/api_client.dart';
 import '../../models/agenda_item.dart';
 import '../../models/agent_proposal.dart';
 import '../widgets/agenda_header.dart';
@@ -19,28 +20,11 @@ class AgendaScreen extends StatefulWidget {
 
 class _AgendaScreenState extends State<AgendaScreen> {
   DateTime _selectedDate = DateTime.now();
+  AgentProposal? _activeProposal;
+  bool _isLoading = false;
 
-  // Propuesta activa del Agente para demostrar el flujo de aprobación
-  AgentProposal? _activeProposal = AgentProposal(
-    id: 'prop_01',
-    summary: 'Optimización de tarde: pausa para despejar',
-    reason:
-        'Detecté 3 horas seguidas de desarrollo. Sugiero insertar 30 min de descanso antes del entrenamiento para mantener la energía.',
-    createdAt: DateTime.now(),
-    resultingItems: [
-      AgendaItem(
-        id: 'prop_item_1',
-        title: 'Caminata y desconexión',
-        description: 'Sugerido por el Agente para evitar fatiga',
-        startTime: DateTime(2026, 9, 14, 17, 30),
-        endTime: DateTime(2026, 9, 14, 18, 0),
-        category: ActivityCategory.leisure,
-      ),
-    ],
-  );
-
-  // Lista de actividades confirmadas
-  late List<AgendaItem> _items = [
+  // Lista de actividades confirmadas (con fallback inicial por si no hay red)
+  List<AgendaItem> _items = [
     AgendaItem(
       id: '1',
       title: 'Desayuno nutritivo y café',
@@ -84,7 +68,36 @@ class _AgendaScreenState extends State<AgendaScreen> {
     ),
   ];
 
-  void _toggleItem(String id) {
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+
+    try {
+      final remoteEvents =
+          await ApiClient.instance.getEvents(date: _selectedDate);
+      final proposal = await ApiClient.instance.getPendingProposal();
+
+      if (mounted) {
+        setState(() {
+          if (remoteEvents.isNotEmpty) {
+            _items = remoteEvents;
+          }
+          _activeProposal = proposal;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _toggleItem(String id) async {
     setState(() {
       _items = _items.map((it) {
         if (it.id == id) {
@@ -93,85 +106,110 @@ class _AgendaScreenState extends State<AgendaScreen> {
         return it;
       }).toList();
     });
+
+    await ApiClient.instance.toggleEvent(id, date: _selectedDate);
   }
 
-  void _acceptProposal() {
+  void _acceptProposal() async {
     if (_activeProposal == null) return;
-    setState(() {
-      _items.addAll(_activeProposal!.resultingItems);
-      _items.sort((a, b) => a.startTime.compareTo(b.startTime));
-      _activeProposal = null;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('¡Propuesta del Agente aplicada a tu agenda!'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    final propId = _activeProposal!.id;
+    final success = await ApiClient.instance.confirmProposal(propId);
+
+    if (success) {
+      await _fetchData();
+    } else {
+      setState(() {
+        _items.addAll(_activeProposal!.resultingItems);
+        _items.sort((a, b) => a.startTime.compareTo(b.startTime));
+        _activeProposal = null;
+      });
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('¡Propuesta del Agente aplicada a tu agenda!'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
-  void _dismissProposal() {
+  void _dismissProposal() async {
+    if (_activeProposal == null) return;
+    final propId = _activeProposal!.id;
     setState(() => _activeProposal = null);
+    await ApiClient.instance.rejectProposal(propId);
   }
 
-  void _openAgentChat() {
-    Navigator.of(context).push(
+  void _openAgentChat() async {
+    await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const ChatScreen()),
     );
+    _fetchData();
   }
 
   @override
   Widget build(BuildContext context) {
     final completedCount = _items.where((i) => i.isCompleted).length;
-    final sortedItems = [..._items]..sort((a, b) => a.startTime.compareTo(b.startTime));
+    final sortedItems = [..._items]
+      ..sort((a, b) => a.startTime.compareTo(b.startTime));
 
     return Scaffold(
       body: AgentScreenBorder(
         child: SafeArea(
-          child: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: AgendaHeader(
-                  selectedDate: _selectedDate,
-                  totalActivities: _items.length,
-                  completedActivities: completedCount,
-                  onDateChanged: (date) {
-                    setState(() => _selectedDate = date);
-                  },
-                ),
-              ),
-
-              // Propuesta pendiente del Agente (si existe)
-              if (_activeProposal != null)
+          child: RefreshIndicator(
+            onRefresh: _fetchData,
+            child: CustomScrollView(
+              slivers: [
                 SliverToBoxAdapter(
-                  child: AgentProposalCard(
-                    proposal: _activeProposal!,
-                    onAccept: _acceptProposal,
-                    onDismiss: _dismissProposal,
+                  child: AgendaHeader(
+                    selectedDate: _selectedDate,
+                    totalActivities: _items.length,
+                    completedActivities: completedCount,
+                    onDateChanged: (date) {
+                      setState(() => _selectedDate = date);
+                      _fetchData();
+                    },
                   ),
                 ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                if (_isLoading)
+                  const SliverToBoxAdapter(
+                    child: LinearProgressIndicator(minHeight: 2),
+                  ),
 
-              // Línea de tiempo visualizadora
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final item = sortedItems[index];
-                    return AtmosphericCard(
-                      key: ValueKey(item.id),
-                      item: item,
-                      onToggleComplete: () => _toggleItem(item.id),
-                      onTap: () {},
-                    );
-                  },
-                  childCount: sortedItems.length,
+                // Propuesta pendiente del Agente (si existe)
+                if (_activeProposal != null)
+                  SliverToBoxAdapter(
+                    child: AgentProposalCard(
+                      proposal: _activeProposal!,
+                      onAccept: _acceptProposal,
+                      onDismiss: _dismissProposal,
+                    ),
+                  ),
+
+                const SliverToBoxAdapter(child: SizedBox(height: 8)),
+
+                // Línea de tiempo visualizadora
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final item = sortedItems[index];
+                      return AtmosphericCard(
+                        key: ValueKey(item.id),
+                        item: item,
+                        onToggleComplete: () => _toggleItem(item.id),
+                        onTap: () {},
+                      );
+                    },
+                    childCount: sortedItems.length,
+                  ),
                 ),
-              ),
 
-              // Espacio inferior para no tapar contenido con el botón flotante
-              const SliverToBoxAdapter(child: SizedBox(height: 96)),
-            ],
+                const SliverToBoxAdapter(child: SizedBox(height: 96)),
+              ],
+            ),
           ),
         ),
       ),

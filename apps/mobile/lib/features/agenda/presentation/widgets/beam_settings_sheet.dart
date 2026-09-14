@@ -1,16 +1,60 @@
 import 'package:flutter/material.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/beam_color_notifier.dart';
 
-/// Modal para personalizar el color del lazo luminoso ("gusanito"),
-/// incluyendo opción multicolor estilo Google / Gemini.
-class BeamSettingsSheet extends StatelessWidget {
+/// Modal para personalizar el color del lazo luminoso ("gusanito")
+/// y configurar la dirección del servidor backend con LLM.
+class BeamSettingsSheet extends StatefulWidget {
   const BeamSettingsSheet({super.key});
+
+  @override
+  State<BeamSettingsSheet> createState() => _BeamSettingsSheetState();
+}
+
+class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
+  late final TextEditingController _serverController;
+  bool _testingConnection = false;
+  String? _connectionStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    _serverController = TextEditingController(text: ApiClient.instance.baseUrl);
+  }
+
+  @override
+  void dispose() {
+    _serverController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _testAndSaveServer() async {
+    final url = _serverController.text.trim();
+    if (url.isEmpty) return;
+
+    setState(() {
+      _testingConnection = true;
+      _connectionStatus = null;
+    });
+
+    await ApiClient.instance.setBaseUrl(url);
+    final events = await ApiClient.instance.getEvents();
+
+    if (mounted) {
+      setState(() {
+        _testingConnection = false;
+        _connectionStatus = events.isNotEmpty
+            ? '✓ Conectado (${events.length} actividades encontradas)'
+            : '✓ Guardado (sin actividades o fuera de línea)';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -47,7 +91,7 @@ class BeamSettingsSheet extends StatelessWidget {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
           ValueListenableBuilder<BeamThemeOption>(
             valueListenable: BeamColorConfig.currentOption,
@@ -83,7 +127,6 @@ class BeamSettingsSheet extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Círculo de color (con degradado multicolor si aplica)
                           Container(
                             width: 20,
                             height: 20,
@@ -133,6 +176,82 @@ class BeamSettingsSheet extends StatelessWidget {
               );
             },
           ),
+
+          const SizedBox(height: 24),
+          const Divider(height: 1),
+          const SizedBox(height: 18),
+
+          Row(
+            children: [
+              const Icon(Icons.dns_rounded, size: 22),
+              const SizedBox(width: 10),
+              Text(
+                'Servidor Backend & LLM',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'URL del servicio FastAPI conectado al Qwen 27B local.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _serverController,
+                  decoration: InputDecoration(
+                    hintText: 'https://agenda.ici-labs.com o IP:8001',
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    filled: true,
+                    fillColor: theme.colorScheme.surfaceContainerHigh,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: _testingConnection ? null : _testAndSaveServer,
+                style: FilledButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+                child: _testingConnection
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Guardar'),
+              ),
+            ],
+          ),
+          if (_connectionStatus != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _connectionStatus!,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  agent-backend:
+    build:
+      context: ../services/backend
+      dockerfile: Dockerfile
+    container_name: agent-backend
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8001
+      - LLM_API_BASE=http://172.17.0.1:8080/v1
+      - LLM_MODEL=qwen-local
+      - DB_PATH=/data/agent_agenda.db
+    volumes:
+      - backend_data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  backend_data:
