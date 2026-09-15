@@ -11,6 +11,7 @@ class AgendaHeader extends StatefulWidget {
   final int totalActivities;
   final int completedActivities;
   final Function(DateTime) onDateChanged;
+  final VoidCallback? onAddActivity;
 
   const AgendaHeader({
     super.key,
@@ -18,6 +19,7 @@ class AgendaHeader extends StatefulWidget {
     required this.totalActivities,
     required this.completedActivities,
     required this.onDateChanged,
+    this.onAddActivity,
   });
 
   @override
@@ -153,7 +155,19 @@ class _AgendaHeaderState extends State<AgendaHeader> {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              if (widget.onAddActivity != null) ...[
+                IconButton.filledTonal(
+                  onPressed: widget.onAddActivity,
+                  icon: const Icon(Icons.add_rounded, size: 20),
+                  tooltip: 'Nueva actividad',
+                  style: IconButton.styleFrom(
+                    backgroundColor: theme.colorScheme.surfaceContainerHigh,
+                    minimumSize: const Size(38, 38),
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
 
               // Tuerca de configuración
               IconButton.filledTonal(

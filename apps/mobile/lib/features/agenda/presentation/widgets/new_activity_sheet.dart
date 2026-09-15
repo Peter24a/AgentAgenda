@@ -3,9 +3,10 @@ import '../../models/agenda_item.dart';
 
 /// Modal estilo Material 3 para crear una nueva actividad en la agenda.
 class NewActivitySheet extends StatefulWidget {
+  final DateTime? targetDate;
   final Function(AgendaItem) onAdd;
 
-  const NewActivitySheet({super.key, required this.onAdd});
+  const NewActivitySheet({super.key, this.targetDate, required this.onAdd});
 
   @override
   State<NewActivitySheet> createState() => _NewActivitySheetState();
@@ -29,20 +30,20 @@ class _NewActivitySheetState extends State<NewActivitySheet> {
     final title = _titleController.text.trim();
     if (title.isEmpty) return;
 
-    final now = DateTime.now();
+    final baseDate = widget.targetDate ?? DateTime.now();
     final start = DateTime(
-      now.year,
-      now.month,
-      now.day,
+      baseDate.year,
+      baseDate.month,
+      baseDate.day,
       _startTime.hour,
       _startTime.minute,
     );
 
     final end = _endTime != null
         ? DateTime(
-            now.year,
-            now.month,
-            now.day,
+            baseDate.year,
+            baseDate.month,
+            baseDate.day,
             _endTime!.hour,
             _endTime!.minute,
           )

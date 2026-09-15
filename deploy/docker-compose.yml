@@ -1,24 +1,55 @@
-version: '3.8'
-
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: agent-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: agentagenda
+      POSTGRES_PASSWORD: agentagendapass
+      POSTGRES_DB: agentagenda
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentagenda -d agentagenda"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - default
+
   agent-backend:
     build:
       context: ../services/backend
       dockerfile: Dockerfile
     container_name: agent-backend
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "8001:8001"
     environment:
       - HOST=0.0.0.0
       - PORT=8001
-      - LLM_API_BASE=http://172.17.0.1:8080/v1
+      - DATABASE_URL=postgresql+asyncpg://agentagenda:agentagendapass@db:5432/agentagenda
+      - STORAGE_PATH=/storage
+      - LLM_API_BASE=http://172.30.81.1:8080/v1
       - LLM_MODEL=qwen-local
-      - DB_PATH=/data/agent_agenda.db
+      - LLM_TIMEOUT=60.0
+      - DEFAULT_TIMEZONE=America/Mexico_City
     volumes:
-      - backend_data:/data
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - document_storage:/storage
+    networks:
+      - default
+      - llm-backend
 
 volumes:
-  backend_data:
+  pg_data:
+  document_storage:
+
+networks:
+  default:
+  llm-backend:
+    external: true

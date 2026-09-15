@@ -38,14 +38,15 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
     });
 
     await ApiClient.instance.setBaseUrl(url);
+    final isHealthy = await ApiClient.instance.checkHealth();
     final events = await ApiClient.instance.getEvents();
 
     if (mounted) {
       setState(() {
         _testingConnection = false;
-        _connectionStatus = events.isNotEmpty
-            ? '✓ Conectado (${events.length} actividades encontradas)'
-            : '✓ Guardado (sin actividades o fuera de línea)';
+        _connectionStatus = isHealthy
+            ? '✓ Conectado exitosamente (${events.length} actividades)'
+            : '✗ No se pudo alcanzar el backend en esa dirección';
       });
     }
   }

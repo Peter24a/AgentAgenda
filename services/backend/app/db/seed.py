@@ -1,16 +1,14 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 import aiosqlite
+from sqlalchemy import select, func
+
 from app.config import settings
 from app.db.database import upsert_event
+from app.db.session import async_session_factory
 from app.models.agenda import AgendaItemModel, ActivityCategory
+from app.models.canonical import Event
 
 async def seed_initial_data_if_empty():
-    async with aiosqlite.connect(settings.db_path) as db:
-        cursor = await db.execute("SELECT COUNT(*) FROM events")
-        row = await cursor.fetchone()
-        if row and row[0] > 0:
-            return  # Already seeded
-
     now = datetime.now()
     today_base = datetime(now.year, now.month, now.day)
 
@@ -80,5 +78,39 @@ async def seed_initial_data_if_empty():
         ),
     ]
 
-    for item in initial_items:
-        await upsert_event(item)
+    # 1. Seed legacy SQLite if empty
+    try:
+        async with aiosqlite.connect(settings.db_path) as db:
+            cursor = await db.execute("SELECT COUNT(*) FROM events")
+            row = await cursor.fetchone()
+            if not row or row[0] == 0:
+                for item in initial_items:
+                    await upsert_event(item)
+    except Exception:
+        pass
+
+    # 2. Seed canonical database if empty
+    try:
+        async with async_session_factory() as session:
+            stmt = select(func.count()).select_from(Event)
+            res = await session.execute(stmt)
+            count = res.scalar() or 0
+            if count == 0:
+                for item in initial_items:
+                    event = Event(
+                        id=item.id,
+                        user_id="default_user",
+                        title=item.title,
+                        description=item.description,
+                        start_time=item.start_time,
+                        end_time=item.end_time,
+                        timezone=settings.default_timezone,
+                        category=item.category.value,
+                        is_completed=item.is_completed,
+                        version=1,
+                        is_deleted=False,
+                    )
+                    session.add(event)
+                await session.commit()
+    except Exception:
+        pass

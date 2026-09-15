@@ -6,11 +6,12 @@ import '../widgets/agenda_header.dart';
 import '../widgets/atmospheric_card.dart';
 import '../widgets/agent_proposal_card.dart';
 import '../widgets/agent_screen_border.dart';
+import '../widgets/new_activity_sheet.dart';
 import '../widgets/premium_agent_button.dart';
 import '../../../chat/presentation/screens/chat_screen.dart';
 
 /// Pantalla visualizadora de la agenda gestionada por el Agente.
-/// Presenta la agenda, las propuestas pendientes del LLM y el botón flotante inferior.
+/// Presenta la agenda real conectada al backend, las propuestas del LLM y controles Pixel.
 class AgendaScreen extends StatefulWidget {
   const AgendaScreen({super.key});
 
@@ -23,50 +24,8 @@ class _AgendaScreenState extends State<AgendaScreen> {
   AgentProposal? _activeProposal;
   bool _isLoading = false;
 
-  // Lista de actividades confirmadas (con fallback inicial por si no hay red)
-  List<AgendaItem> _items = [
-    AgendaItem(
-      id: '1',
-      title: 'Desayuno nutritivo y café',
-      description: 'Avena con fruta y espresso doble',
-      startTime: DateTime(2026, 9, 14, 8, 0),
-      endTime: DateTime(2026, 9, 14, 8, 45),
-      category: ActivityCategory.food,
-      isCompleted: true,
-    ),
-    AgendaItem(
-      id: '2',
-      title: 'Bloque de código: AgentAgenda',
-      description: 'Implementar interfaz Pixel y backend FastAPI',
-      startTime: DateTime(2026, 9, 14, 9, 30),
-      endTime: DateTime(2026, 9, 14, 12, 30),
-      category: ActivityCategory.work,
-    ),
-    AgendaItem(
-      id: '3',
-      title: 'Comida y descanso ligero',
-      description: 'Pausa para despejar y caminar un poco',
-      startTime: DateTime(2026, 9, 14, 14, 0),
-      endTime: DateTime(2026, 9, 14, 15, 0),
-      category: ActivityCategory.food,
-    ),
-    AgendaItem(
-      id: '4',
-      title: 'Entrenamiento de fuerza y cardio',
-      description: 'Rutina de 45 minutos en el gimnasio',
-      startTime: DateTime(2026, 9, 14, 18, 30),
-      endTime: DateTime(2026, 9, 14, 19, 30),
-      category: ActivityCategory.exercise,
-    ),
-    AgendaItem(
-      id: '5',
-      title: 'Dormir y descanso profundo',
-      description: 'Dejar el teléfono en no molestar y descansar 8 horas',
-      startTime: DateTime(2026, 9, 14, 22, 30),
-      endTime: DateTime(2026, 9, 15, 6, 30),
-      category: ActivityCategory.sleep,
-    ),
-  ];
+  // Lista de actividades sincronizadas en vivo desde el backend (sin datos mock)
+  List<AgendaItem> _items = [];
 
   @override
   void initState() {
@@ -85,9 +44,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
       if (mounted) {
         setState(() {
-          if (remoteEvents.isNotEmpty) {
-            _items = remoteEvents;
-          }
+          _items = remoteEvents;
           _activeProposal = proposal;
           _isLoading = false;
         });
@@ -110,28 +67,131 @@ class _AgendaScreenState extends State<AgendaScreen> {
     await ApiClient.instance.toggleEvent(id, date: _selectedDate);
   }
 
+  void _deleteItem(String id) async {
+    final previousItems = [..._items];
+    setState(() {
+      _items.removeWhere((it) => it.id == id);
+    });
+
+    final success = await ApiClient.instance.deleteEvent(id);
+    if (!success && mounted) {
+      setState(() => _items = previousItems);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo eliminar la actividad.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Actividad eliminada.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _openNewActivityModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) => NewActivitySheet(
+        targetDate: _selectedDate,
+        onAdd: (newItem) async {
+          final created = await ApiClient.instance.createOrUpdateEvent(newItem);
+          if (created != null && mounted) {
+            await _fetchData();
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('¡Actividad agregada a la agenda!'),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  void _showItemOptions(AgendaItem item) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: Icon(
+                    item.isCompleted
+                        ? Icons.remove_done_rounded
+                        : Icons.check_circle_outline_rounded,
+                    color: theme.colorScheme.primary,
+                  ),
+                  title: Text(
+                    item.isCompleted
+                        ? 'Marcar como pendiente'
+                        : 'Marcar como completada',
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _toggleItem(item.id);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                  title: const Text(
+                    'Eliminar actividad',
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _deleteItem(item.id);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _acceptProposal() async {
     if (_activeProposal == null) return;
     final propId = _activeProposal!.id;
     final success = await ApiClient.instance.confirmProposal(propId);
 
-    if (success) {
-      await _fetchData();
-    } else {
-      setState(() {
-        _items.addAll(_activeProposal!.resultingItems);
-        _items.sort((a, b) => a.startTime.compareTo(b.startTime));
-        _activeProposal = null;
-      });
-    }
-
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('¡Propuesta del Agente aplicada a tu agenda!'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      if (success) {
+        await _fetchData();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('¡Propuesta del Agente aplicada a tu agenda!'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo confirmar la propuesta en el servidor.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -151,6 +211,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final completedCount = _items.where((i) => i.isCompleted).length;
     final sortedItems = [..._items]
       ..sort((a, b) => a.startTime.compareTo(b.startTime));
@@ -171,6 +232,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                       setState(() => _selectedDate = date);
                       _fetchData();
                     },
+                    onAddActivity: _openNewActivityModal,
                   ),
                 ),
 
@@ -191,21 +253,87 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
                 const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
-                // Línea de tiempo visualizadora
-                SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final item = sortedItems[index];
-                      return AtmosphericCard(
-                        key: ValueKey(item.id),
-                        item: item,
-                        onToggleComplete: () => _toggleItem(item.id),
-                        onTap: () {},
-                      );
-                    },
-                    childCount: sortedItems.length,
+                // Estado vacío amigable cuando no hay eventos para la fecha
+                if (!_isLoading && sortedItems.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.event_available_rounded,
+                                size: 32,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Sin actividades agendadas',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Pide al Agente que organice tu itinerario o agrega una actividad manualmente.',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            FilledButton.tonalIcon(
+                              onPressed: _openNewActivityModal,
+                              icon: const Icon(Icons.add_rounded, size: 20),
+                              label: const Text('Agregar actividad'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+
+                // Línea de tiempo visualizadora
+                if (sortedItems.isNotEmpty)
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final item = sortedItems[index];
+                        return Dismissible(
+                          key: ValueKey('dismiss_${item.id}'),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 28),
+                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent.withValues(alpha: 0.85),
+                              borderRadius: BorderRadius.circular(28),
+                            ),
+                            child: const Icon(Icons.delete_rounded, color: Colors.white, size: 28),
+                          ),
+                          onDismissed: (_) => _deleteItem(item.id),
+                          child: AtmosphericCard(
+                            key: ValueKey(item.id),
+                            item: item,
+                            onToggleComplete: () => _toggleItem(item.id),
+                            onTap: () => _showItemOptions(item),
+                          ),
+                        );
+                      },
+                      childCount: sortedItems.length,
+                    ),
+                  ),
 
                 const SliverToBoxAdapter(child: SizedBox(height: 96)),
               ],

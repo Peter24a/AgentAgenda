@@ -19,6 +19,8 @@ build/
 *.sqlite
 *.sqlite3
 backend_data/
+storage/
+**/storage/
 
 # Entornos y secretos
 .env
@@ -28,3 +30,4 @@ backend_data/
 # Logs y temporales
 *.log
 .DS_Store
+.pytest_cache/

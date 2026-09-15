@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../../core/network/api_client.dart';
 import '../../../agenda/models/agent_proposal.dart';
 import '../../../agenda/presentation/widgets/agent_proposal_card.dart';
@@ -40,6 +41,50 @@ class _ChatScreenState extends State<ChatScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    try {
+      final messages = await ApiClient.instance.getChatMessages(limit: 50);
+      if (messages.isNotEmpty && mounted) {
+        setState(() {
+          _messages.clear();
+          for (final m in messages) {
+            final text = m['content'] as String? ?? m['text'] as String? ?? '';
+            final role = m['role'] as String?;
+            final isUser = role == 'user' || m['is_user'] == true;
+            if (text.isNotEmpty) {
+              _messages.add(
+                ChatMessage(
+                  text: text,
+                  isUser: isUser,
+                  timestamp: m['created_at'] != null
+                      ? DateTime.parse(m['created_at'] as String)
+                      : DateTime.now(),
+                ),
+              );
+            }
+          }
+          if (_messages.isEmpty) {
+            _messages.add(
+              ChatMessage(
+                text:
+                    '¡Hola! Soy tu asistente de agenda. Puedo ayudarte a reorganizar tus horas, resolver conflictos o planear tu día.',
+                isUser: false,
+                timestamp: DateTime.now(),
+              ),
+            );
+          }
+        });
+        _scrollToBottom();
+      }
+    } catch (_) {}
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();
@@ -78,10 +123,10 @@ class _ChatScreenState extends State<ChatScreen> {
     final assistantMsgIndex = _messages.length - 1;
 
     // Build history
-    final history = _messages.take(_messages.length - 2).map((m) => {
-      'text': m.text,
-      'is_user': m.isUser,
-    }).toList();
+    final history = _messages
+        .take(_messages.length - 2)
+        .map((m) => {'text': m.text, 'is_user': m.isUser})
+        .toList();
 
     try {
       final stream = ApiClient.instance.streamChat(
@@ -191,8 +236,8 @@ class _ChatScreenState extends State<ChatScreen> {
                           color: msg.isUser
                               ? theme.colorScheme.primary
                               : (isDark
-                                  ? theme.colorScheme.surfaceContainerHigh
-                                  : theme.colorScheme.surfaceContainerLow),
+                                    ? theme.colorScheme.surfaceContainerHigh
+                                    : theme.colorScheme.surfaceContainerLow),
                           borderRadius: BorderRadius.only(
                             topLeft: const Radius.circular(20),
                             topRight: const Radius.circular(20),
@@ -201,7 +246,9 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                         ),
                         child: Text(
-                          msg.text.isEmpty && _isGenerating ? 'Pensando...' : msg.text,
+                          msg.text.isEmpty && _isGenerating
+                              ? 'Pensando...'
+                              : msg.text,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: msg.isUser
                                 ? theme.colorScheme.onPrimary
@@ -216,18 +263,34 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: AgentProposalCard(
                           proposal: msg.proposal!,
                           onAccept: () async {
-                            await ApiClient.instance.confirmProposal(msg.proposal!.id);
+                            final applied = await ApiClient.instance
+                                .confirmProposal(msg.proposal!.id);
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('¡Propuesta aplicada con éxito!'),
+                                SnackBar(
+                                  content: Text(
+                                    applied
+                                        ? '¡Propuesta aplicada con éxito!'
+                                        : 'No se pudo aplicar la propuesta.',
+                                  ),
                                   behavior: SnackBarBehavior.floating,
                                 ),
                               );
                             }
                           },
                           onDismiss: () async {
-                            await ApiClient.instance.rejectProposal(msg.proposal!.id);
+                            final rejected = await ApiClient.instance
+                                .rejectProposal(msg.proposal!.id);
+                            if (!rejected && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'No se pudo descartar la propuesta.',
+                                  ),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
                           },
                         ),
                       ),
@@ -246,7 +309,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       controller: _controller,
                       enabled: !_isGenerating,
                       decoration: InputDecoration(
-                        hintText: _isGenerating ? 'Generando respuesta...' : 'Pide reorganizar o consulta...',
+                        hintText: _isGenerating
+                            ? 'Generando respuesta...'
+                            : 'Pide reorganizar o consulta...',
                         filled: true,
                         fillColor: theme.colorScheme.surfaceContainerHighest
                             .withValues(alpha: 0.5),

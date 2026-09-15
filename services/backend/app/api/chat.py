@@ -1,54 +1,135 @@
 import json
-from datetime import datetime
-from typing import AsyncGenerator
-from fastapi import APIRouter
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
-from app.models.chat import ChatRequest
-from app.db.database import get_events_for_date, save_proposal
-from app.services.prompt_builder import build_llm_messages
-from app.services.llm_service import stream_chat_completion
-from app.services.proposal_parser import extract_proposal_from_text
+from sqlalchemy.ext.asyncio import AsyncSession
 
-router = APIRouter(prefix="/v1/chat", tags=["Chat"])
+from app.api.deps import get_current_auth, get_db_session, require_scope
+from app.models.auth import AuthContext
+from app.models.chat import (
+    ChatMessageResponse,
+    ChatRequest,
+    ChatTurnResponse,
+    CreateTurnRequest,
+)
+from app.services.chat_orchestrator import chat_orchestrator
 
-async def sse_event_generator(request: ChatRequest) -> AsyncGenerator[str, None]:
-    target_date = request.date or datetime.now().strftime("%Y-%m-%d")
-    events = await get_events_for_date(target_date)
+router = APIRouter(prefix="/v1/chat", tags=["Durable Chat & LLM"])
 
-    messages = build_llm_messages(
-        current_date=target_date,
-        events=events,
-        user_message=request.message,
-        history=request.history
+
+@router.post(
+    "/turns",
+    response_model=ChatTurnResponse,
+    summary="Crear o recuperar turno de conversación durable",
+    description="Persiste de inmediato el mensaje de usuario en base de datos con status 'queued' e inicia la generación desacoplada en segundo plano.",
+)
+async def create_chat_turn(
+    req: CreateTurnRequest,
+    session: AsyncSession = Depends(get_db_session),
+    auth: AuthContext = Depends(require_scope("chat:write")),
+):
+    turn_response, created = await chat_orchestrator.create_or_get_turn(
+        session=session,
+        user_id=auth.user_id,
+        device_id=auth.device_id,
+        req=req,
     )
+    return turn_response
 
-    full_response = ""
-    async for chunk in stream_chat_completion(messages):
-        full_response += chunk
-        payload = json.dumps({"type": "token", "content": chunk})
-        yield f"data: {payload}\n\n"
 
-    # Analyze if completion generated a structured proposal
-    proposal, clean_text = extract_proposal_from_text(full_response)
-    if proposal:
-        await save_proposal(proposal)
-        prop_payload = json.dumps({
-            "type": "proposal",
-            "proposal": proposal.model_dump(mode="json")
-        })
-        yield f"data: {prop_payload}\n\n"
+@router.get(
+    "/turns/{turn_id}",
+    response_model=ChatTurnResponse,
+    summary="Consultar estado durable de un turno",
+    description="Permite recuperar el estado y contenido completo del asistente tras reconexión (queued, running, completed, failed).",
+)
+async def get_chat_turn(
+    turn_id: str,
+    session: AsyncSession = Depends(get_db_session),
+    auth: AuthContext = Depends(require_scope("chat:read")),
+):
+    turn_resp = await chat_orchestrator.get_turn_response(
+        session=session,
+        user_id=auth.user_id,
+        turn_id=turn_id,
+    )
+    if not turn_resp:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Turno '{turn_id}' no encontrado",
+        )
+    return turn_resp
 
-    done_payload = json.dumps({"type": "done"})
-    yield f"data: {done_payload}\n\n"
 
-@router.post("/stream")
-async def chat_stream(request: ChatRequest):
+@router.get(
+    "/turns/{turn_id}/stream",
+    summary="Suscripción SSE a la generación de un turno",
+    description="Envía tokens en tiempo real vía Server-Sent Events. Si el cliente se desconecta, la persistencia en el backend continúa hasta completarse.",
+)
+async def stream_chat_turn(
+    turn_id: str,
+    auth: AuthContext = Depends(require_scope("chat:read")),
+):
     return StreamingResponse(
-        sse_event_generator(request),
+        chat_orchestrator.subscribe_turn_sse(turn_id, auth.user_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
-        }
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get(
+    "/messages",
+    response_model=List[ChatMessageResponse],
+    summary="Historial durable de mensajes",
+    description="Devuelve el historial de conversación paginado mediante cursor.",
+)
+async def list_chat_messages(
+    cursor: Optional[str] = Query(None, description="Cursor para paginación"),
+    limit: int = Query(50, ge=1, le=100, description="Cantidad máxima de mensajes"),
+    session: AsyncSession = Depends(get_db_session),
+    auth: AuthContext = Depends(require_scope("chat:read")),
+):
+    return await chat_orchestrator.list_messages(
+        session=session,
+        user_id=auth.user_id,
+        cursor=cursor,
+        limit=limit,
+    )
+
+
+@router.post(
+    "/stream",
+    summary="Streaming de compatibilidad con app móvil existente",
+    description="Crea un turno durable en segundo plano y emite el stream SSE de forma transparente.",
+)
+async def chat_stream_legacy(
+    request: ChatRequest,
+    session: AsyncSession = Depends(get_db_session),
+    auth: AuthContext = Depends(require_scope("chat:write")),
+):
+    # Convertir petición legacy a CreateTurnRequest
+    turn_req = CreateTurnRequest(
+        message=request.message,
+        date=request.date,
+        history=request.history,
+    )
+    turn_resp, _ = await chat_orchestrator.create_or_get_turn(
+        session=session,
+        user_id=auth.user_id,
+        device_id=auth.device_id,
+        req=turn_req,
+    )
+
+    return StreamingResponse(
+        chat_orchestrator.subscribe_turn_sse(turn_resp.turn_id, auth.user_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
