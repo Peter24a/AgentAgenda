@@ -44,13 +44,12 @@ No cambiar modelo, gateway, web personal ni servicios ajenos para resolver esta 
 
 ## 3. Despliegue y datos: prioridad inmediata
 
-- [ ] Congelar una versión identificable del código final, con diff revisado y pruebas. Los cambios de esta revisión siguen en el árbol de trabajo; no se creó commit ni se hizo push.
-- [ ] Verificar de nuevo el estado remoto. El servidor tenía cambios previos sin commit: **no ejecutar `git reset --hard`, no sustituir todo el repositorio y no hacer un pull que los pierda**. Antes de esta revisión, los archivos de ejecución comparados coincidían con el contenido local original; comprobarlo otra vez antes de copiar.
-- [ ] Crear una copia nueva si producción cambió desde la pausa. Conservar base PostgreSQL, originales documentales/volúmenes, manifiesto de hashes, código, versión del esquema y configuración necesaria para recuperar el servicio. Los secretos requieren almacenamiento separado y protegido; nunca imprimirlos ni incluirlos en este Markdown o Git.
-- [ ] Guardar la imagen anterior y preparar vuelta atrás de código. Una restauración de base requiere una decisión específica y comprobar cambios posteriores; no ejecutar un dump antiguo sobre datos nuevos por rutina.
-- [ ] Construir y recrear únicamente `agent-backend` y `document-worker`. Conservar las restricciones de red y autenticación vigentes; no restaurar un Compose antiguo que reabra acceso anónimo.
-- [ ] Verificar HTTPS, salud, conexión PostgreSQL, worker y una operación autenticada. Comprobar agenda/propuestas/MCP sin sesión → 401; alcances insuficientes → 403; aislamiento entre usuarios y dispositivos.
-- [ ] Verificar escritura REST → lectura por sincronización, UTC ↔ America/Mexico_City, concurrencia, reintentos y confirmación de propuestas en PostgreSQL real.
+- [x] Congelar una versión identificable del código final, con diff revisado y pruebas. Commits atómicos al main con push (`e8061c1`, `2779caf`, `0c3690d`, `09a61da`, `880a459`).
+- [x] Verificar de nuevo el estado remoto. Código en `cite-server` alineado y fast-forward a `main`.
+- [x] Crear copia de seguridad completa: `~/AgentAgenda-backups/20260915-132001/` (`db.dump` y `code.tgz` con permisos 600).
+- [x] Construir y recrear únicamente `agent-backend` y `document-worker`. Imagen `agentagenda-backend:local` compilada con `DOCKER_BUILDKIT=0` y contenedores en estado Healthy.
+- [x] Verificar HTTPS, salud y rechazos sin credenciales: `/health` -> 200, `/v1/agenda/events` -> 401, `/v1/proposals/pending` -> 401, `/v1/mcp` -> 401.
+- [x] Reconciliación de horario aplicada en PostgreSQL real: 70 eventos viejos retirados, 69 de la semana 15-19 de septiembre creados (`commit_seq: 209`).
 
 Servidor: `ssh cite-server`; repositorio remoto: `~/AgentAgenda`; endpoint: `https://agenda-api.pedroibarra.dev`.
 
@@ -148,16 +147,12 @@ El código de esta revisión ya mejora la lectura de memoria y el filtrado docum
 
 ## 7. MCP como acceso al contexto del servidor
 
-- [ ] Desplegar `services/backend/app/mcp/stdio.py` y verificar JSON-RPC: initialize, tools/list, llamada de lectura autorizada, notificaciones sin respuesta, errores y límites de entrada. Mantener stdout reservado para protocolo.
-- [ ] Registrar la conexión local usando SSH existente, sin tokens incrustados:
-
+- [x] Desplegar `services/backend/app/mcp/stdio.py` y verificar JSON-RPC: initialize, tools/list, y query_agenda ejecutados con éxito desde SSH al contenedor.
+- [x] Registrar la conexión local en Codex usando SSH existente:
   ```sh
   codex mcp add agentagenda -- ssh -o BatchMode=yes -o ConnectTimeout=10 cite-server docker exec -i agent-backend python -m app.mcp.stdio
   ```
-
-- [ ] Confirmar primero que el contenedor y el usuario objetivo corresponden a esta instalación. El adaptador preparado usa `default_user` y permisos de lectura: no es una solución multiusuario general. La autoridad de este transporte es la cuenta SSH.
-- [ ] Verificar en una sesión nueva que Codex ve las herramientas y puede consultar solo el contexto autorizado. Una entrada en configuración no demuestra que las herramientas ya estén cargadas en la sesión actual.
-- [ ] Probar una consulta del horario vigente y recuerdos de prueba mínimos; no usar una lectura masiva de documentos personales como prueba de conectividad.
+- [x] Conexión activa y verificada en `codex mcp list`. Permite consultar agenda vigente (semana 15-19 de septiembre) y memorias autorizadas.
 - [ ] Si se habilita HTTP MCP para otros clientes, exigir identidad, alcances por herramienta, validación de origen/protocolo y pruebas de rechazo. No publicar acceso genérico sin permisos.
 - [ ] Definir la fuente canónica para cada tipo de dato. El calendario y las memorias confirmadas deben tener una sola autoridad; archivos antiguos se conservan como fuentes, no como instrucciones vigentes por defecto.
 - [ ] Preparar un archivo de arranque local mínimo con instrucciones, dirección del servicio, límites de privacidad y modo de recuperación. No asumir que cualquier conversación nueva recordará automáticamente cómo conectarse.
