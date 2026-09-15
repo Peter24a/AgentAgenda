@@ -41,12 +41,11 @@ class ApiClient {
 
   static const String _prefKey = 'backend_base_url';
   static const String _tokenPrefKey = 'backend_auth_token';
-  static const String _appKeyPrefKey = 'backend_app_key';
-
-  static const String _defaultDevSecret =
-      'agent-agenda-dev-secret-key-must-change-in-prod-123456789';
+  static const String _refreshPrefKey = 'backend_refresh_token';
 
   static String get defaultPlatformUrl {
+    const configured = String.fromEnvironment('BACKEND_URL');
+    if (configured.isNotEmpty) return configured;
     if (kIsWeb) return 'http://127.0.0.1:8001';
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -63,21 +62,40 @@ class ApiClient {
   String _baseUrl = defaultPlatformUrl;
   String get baseUrl => _baseUrl;
 
-  String _appKey = _defaultDevSecret;
   String? _authToken;
 
   Map<String, String> get _headers => {
-        'Content-Type': 'application/json',
-        'X-App-Key': _appKey,
-        if (_authToken != null && _authToken!.isNotEmpty)
-          'Authorization': 'Bearer $_authToken',
-      };
+    'Content-Type': 'application/json',
+    if (_authToken != null && _authToken!.isNotEmpty)
+      'Authorization': 'Bearer $_authToken',
+  };
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _baseUrl = prefs.getString(_prefKey) ?? defaultPlatformUrl;
     _authToken = prefs.getString(_tokenPrefKey);
-    _appKey = prefs.getString(_appKeyPrefKey) ?? _defaultDevSecret;
+    final refresh = prefs.getString(_refreshPrefKey);
+    if (refresh != null && refresh.isNotEmpty) {
+      try {
+        final response = await http
+            .post(
+              Uri.parse('$_baseUrl/v1/auth/refresh'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'refresh_token': refresh}),
+            )
+            .timeout(const Duration(seconds: 8));
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          final access = data['access_token'] as String;
+          final nextRefresh = data['refresh_token'] as String;
+          await prefs.setString(_tokenPrefKey, access);
+          await prefs.setString(_refreshPrefKey, nextRefresh);
+          _authToken = access;
+        }
+      } catch (_) {
+        // Offline startup retains the current session for a later connection.
+      }
+    }
   }
 
   Future<void> setBaseUrl(String url) async {
@@ -138,11 +156,7 @@ class ApiClient {
     final uri = Uri.parse('$_baseUrl/v1/agenda/events');
     try {
       final response = await http
-          .post(
-            uri,
-            headers: _headers,
-            body: jsonEncode(item.toJson()),
-          )
+          .post(uri, headers: _headers, body: jsonEncode(item.toJson()))
           .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
@@ -346,7 +360,9 @@ class ApiClient {
 
     final lines = response.stream
         .transform(utf8.decoder)
-        .transform(const LineSplitter());
+        .transform(const LineSplitter())
+        .timeout(const Duration(seconds: 120));
+    var terminalEvent = false;
 
     try {
       await for (final line in lines) {
@@ -364,10 +380,23 @@ class ApiClient {
             final propData = json['proposal'] as Map<String, dynamic>;
             yield ChatProposalEvent(_proposalFromJson(propData));
           } else if (type == 'done') {
+            terminalEvent = true;
             yield const ChatDoneEvent();
+          } else if (type == 'error') {
+            terminalEvent = true;
+            yield ChatErrorEvent(
+              json['message'] as String? ?? 'Falló la generación de IA.',
+            );
           }
         } catch (_) {}
       }
+      if (!terminalEvent) {
+        yield const ChatErrorEvent(
+          'La respuesta se interrumpió. Intenta de nuevo.',
+        );
+      }
+    } catch (_) {
+      yield const ChatErrorEvent('Se perdió la conexión durante la respuesta.');
     } finally {
       client.close();
     }

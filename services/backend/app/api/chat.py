@@ -17,6 +17,10 @@ from app.services.chat_orchestrator import chat_orchestrator
 router = APIRouter(prefix="/v1/chat", tags=["Durable Chat & LLM"])
 
 
+def _can_read_documents(auth: AuthContext) -> bool:
+    return bool(set(auth.scopes or []) & {"documents:read", "documents:*", "*", "admin"})
+
+
 @router.post(
     "/turns",
     response_model=ChatTurnResponse,
@@ -33,6 +37,7 @@ async def create_chat_turn(
         user_id=auth.user_id,
         device_id=auth.device_id,
         req=req,
+        allow_document_context=_can_read_documents(auth),
     )
     return turn_response
 
@@ -122,6 +127,7 @@ async def chat_stream_legacy(
         user_id=auth.user_id,
         device_id=auth.device_id,
         req=turn_req,
+        allow_document_context=_can_read_documents(auth),
     )
 
     return StreamingResponse(

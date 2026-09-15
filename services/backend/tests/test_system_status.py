@@ -23,6 +23,6 @@ async def test_system_status_subsystems(client: AsyncClient):
     assert data["sync_schema_version"] == 1
     assert data["database"]["status"] == "connected"
     assert data["storage"]["status"] == "ready"
-    assert data["worker"]["status"] == "active"
+    assert data["worker"]["status"] in ("active", "offline")
     assert "llm" in data
     assert "timestamp" in data

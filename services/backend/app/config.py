@@ -1,5 +1,6 @@
 import os
 from pydantic_settings import BaseSettings
+from pydantic import SecretStr
 
 class Settings(BaseSettings):
     app_name: str = "AgentAgenda Backend"
@@ -21,8 +22,10 @@ class Settings(BaseSettings):
 
     # LLM server config (llama-server local)
     llm_api_base: str = os.getenv("LLM_API_BASE", "http://127.0.0.1:8080/v1")
+    llm_api_key: SecretStr = SecretStr(os.getenv("LLM_API_KEY", ""))
+    llm_health_url: str = os.getenv("LLM_HEALTH_URL", "")
     llm_model: str = os.getenv("LLM_MODEL", "qwen-local")
-    llm_timeout_seconds: float = float(os.getenv("LLM_TIMEOUT", "60.0"))
+    llm_timeout_seconds: float = float(os.getenv("LLM_TIMEOUT", "90.0"))
 
     # Zonas horarias y temporalidad canónica
     default_timezone: str = os.getenv("DEFAULT_TIMEZONE", "America/Mexico_City")

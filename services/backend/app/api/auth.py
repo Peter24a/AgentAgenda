@@ -24,8 +24,8 @@ router = APIRouter(prefix="/v1/auth", tags=["Auth & Devices"])
     summary="Generar código de emparejamiento de un solo uso",
     description="Crea un desafío alfanumérico temporal con caducidad para emparejar un nuevo dispositivo.",
 )
-async def generate_pairing_challenge():
-    code, expires_at, ttl = auth_service.create_pairing_challenge()
+async def generate_pairing_challenge(auth: AuthContext = Depends(get_current_auth)):
+    code, expires_at, ttl = auth_service.create_pairing_challenge(user_id=auth.user_id)
     return ChallengeResponse(
         pairing_code=code,
         expires_at=expires_at,

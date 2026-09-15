@@ -1,14 +1,19 @@
+import asyncio
 import os
-import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.models.canonical import DocumentRevision, Event, Job, Reminder
+from app.models.canonical import Document, DocumentRevision, Event, Job, Reminder
+from app.services.document_extraction import extract_document
+
+
+class DocumentExtractionNotice(str):
+    """Completed extraction that needs attention, retained in the job diagnostic."""
 
 
 class BackgroundWorker:
@@ -26,30 +31,33 @@ class BackgroundWorker:
         if not rev:
             raise ValueError(f"Revisión '{revision_id}' no encontrada en base de datos")
 
-        if not os.path.exists(rev.storage_path):
-            rev.extraction_status = "failed"
-            await session.commit()
-            raise ValueError(f"El archivo físico '{rev.storage_path}' no existe en disco")
-
-        # Extracción resiliente de texto
-        extracted = ""
-        try:
-            with open(rev.storage_path, "rb") as f:
-                raw = f.read(1024 * 512) # Leer hasta 512 KB
-                text_content = raw.decode("utf-8", errors="ignore")
-                words = re.findall(r"[a-zA-Z0-9_\-áéíóúÁÉÍÓÚñÑ\.,;:\s]{4,}", text_content)
-                extracted = " ".join([w.strip() for w in words if len(w.strip()) > 3])
-                if not extracted:
-                    extracted = f"Documento binario indexado: {rev.original_filename} ({rev.mime_type})"
-        except Exception as e:
-            rev.extraction_status = "failed"
-            await session.commit()
-            raise e
-
-        rev.extracted_text = extracted[:4000] # Limitar a 4000 caracteres de resumen
-        rev.extraction_status = "ready"
+        active_document = select(Document.id).where(
+            Document.id == rev.document_id, Document.is_deleted.is_(False)
+        )
+        if (await session.execute(active_document)).scalar_one_or_none() is None:
+            return DocumentExtractionNotice("Documento eliminado; extracción omitida.")
+        storage_path, filename, mime_type = rev.storage_path, rev.original_filename, rev.mime_type
+        # Close the read transaction before slow I/O, so a concurrent deletion is visible.
         await session.commit()
-        return f"Texto extraído ({len(rev.extracted_text)} caracteres)"
+        result = await asyncio.to_thread(extract_document, storage_path, filename, mime_type)
+        # The conditional write checks deletion again atomically and cannot resurrect content.
+        saved = await session.execute(
+            update(DocumentRevision)
+            .where(
+                DocumentRevision.id == revision_id,
+                DocumentRevision.document_id.in_(active_document),
+            )
+            .values(extracted_text=result.text, extraction_status=result.status)
+            .execution_options(synchronize_session=False)
+        )
+        await session.commit()
+        if not saved.rowcount:
+            return DocumentExtractionNotice("Documento eliminado durante la extracción; resultado descartado.")
+        if result.status == "failed":
+            raise ValueError(result.detail)
+        if result.status != "ready":
+            return DocumentExtractionNotice(f"{result.status}: {result.detail}")
+        return f"Texto extraído ({len(result.text or '')} caracteres)"
 
     async def handle_generate_reminders(
         self, session: AsyncSession, payload: Dict
@@ -127,17 +135,26 @@ class BackgroundWorker:
 
     async def process_single_job(
         self, session: AsyncSession, job: Job
-    ) -> bool:
+    ) -> Optional[bool]:
         now = datetime.now(timezone.utc).replace(tzinfo=None)
-        job.attempts += 1
-        job.status = "processing"
-        job.updated_at = now
+        # API requests and the periodic runner can select the same pending job.
+        # Only the process that wins this compare-and-set may execute it.
+        claimed = await session.execute(
+            update(Job)
+            .where(Job.id == job.id, Job.status == "pending", Job.scheduled_at <= now)
+            .values(attempts=Job.attempts + 1, status="processing", updated_at=now)
+            .execution_options(synchronize_session=False)
+        )
         await session.commit()
+        if not claimed.rowcount:
+            return None
+        await session.refresh(job)
 
         success = False
         try:
+            notice = None
             if job.job_type == "document_extraction":
-                await self.handle_document_extraction(session, job.payload_json)
+                notice = await self.handle_document_extraction(session, job.payload_json)
             elif job.job_type == "generate_reminders":
                 await self.handle_generate_reminders(session, job.payload_json)
             elif job.job_type == "cleanup_temp_uploads":
@@ -146,7 +163,7 @@ class BackgroundWorker:
                 raise ValueError(f"Tipo de trabajo desconocido: {job.job_type}")
 
             job.status = "completed"
-            job.error_message = None
+            job.error_message = str(notice) if isinstance(notice, DocumentExtractionNotice) else None
             success = True
         except Exception as e:
             job.error_message = str(e)
@@ -179,16 +196,20 @@ class BackgroundWorker:
         processed = 0
         succeeded = 0
         failed = 0
+        claimed_jobs = []
 
         for j in jobs:
             ok = await self.process_single_job(session, j)
+            if ok is None:
+                continue
+            claimed_jobs.append(j)
             processed += 1
             if ok:
                 succeeded += 1
             else:
                 failed += 1
 
-        return processed, succeeded, failed, jobs
+        return processed, succeeded, failed, claimed_jobs
 
 
 background_worker = BackgroundWorker()

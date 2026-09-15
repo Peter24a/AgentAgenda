@@ -195,3 +195,24 @@ async def test_legacy_chat_stream_compatibility(client, auth_headers):
         text = legacy_res.text
         assert "data: " in text
         assert "done" in text
+
+
+@pytest.mark.asyncio
+async def test_llm_failure_is_failed_turn_without_assistant_message(client, auth_headers):
+    from app.services.llm_service import LLMError
+    from app.services.chat_orchestrator import chat_orchestrator
+
+    async def broken_stream(*args, **kwargs):
+        yield 'partial'
+        raise LLMError('Servicio no disponible')
+
+    with patch('app.services.chat_orchestrator.stream_chat_completion', side_effect=broken_stream):
+        res = await client.post('/v1/chat/turns', json={'message': 'test failure'}, headers=auth_headers)
+        turn_id = res.json()['turn_id']
+        task = chat_orchestrator._active_tasks.get(turn_id)
+        if task:
+            await task
+        turn = (await client.get(f'/v1/chat/turns/{turn_id}', headers=auth_headers)).json()
+        assert turn['status'] == 'failed'
+        assert turn['assistant_message'] is None
+        assert turn['error_message'] == 'Servicio no disponible'

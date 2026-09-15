@@ -23,27 +23,54 @@ services:
     build:
       context: ../services/backend
       dockerfile: Dockerfile
+    image: agentagenda-backend:local
     container_name: agent-backend
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
     ports:
-      - "8001:8001"
+      - "127.0.0.1:8001:8001"
     environment:
+      - ALLOW_ANONYMOUS_FALLBACK=false
+      - SECRET_KEY=${SECRET_KEY:?Set a private backend secret in deploy/.env}
       - HOST=0.0.0.0
       - PORT=8001
       - DATABASE_URL=postgresql+asyncpg://agentagenda:agentagendapass@db:5432/agentagenda
       - STORAGE_PATH=/storage
-      - LLM_API_BASE=http://172.30.81.1:8080/v1
+      - LLM_API_BASE=http://llm-gateway:8000/v1
+      - LLM_HEALTH_URL=http://llm-gateway:8000/ready
+      - LLM_API_KEY=${LLM_API_KEY:?Set the AgentAgenda application key in deploy/.env}
       - LLM_MODEL=qwen-local
-      - LLM_TIMEOUT=60.0
+      - LLM_TIMEOUT=90.0
       - DEFAULT_TIMEZONE=America/Mexico_City
     volumes:
       - document_storage:/storage
     networks:
       - default
-      - llm-backend
+      - llm-apps
+
+  document-worker:
+    image: agentagenda-backend:local
+    container_name: agent-document-worker
+    restart: unless-stopped
+    init: true
+    command: ["python", "-m", "app.worker.runner"]
+    depends_on:
+      agent-backend:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://agentagenda:agentagendapass@db:5432/agentagenda
+      - STORAGE_PATH=/storage
+    volumes:
+      - document_storage:/storage
+    networks:
+      - default
 
 volumes:
   pg_data:
@@ -51,5 +78,5 @@ volumes:
 
 networks:
   default:
-  llm-backend:
+  llm-apps:
     external: true

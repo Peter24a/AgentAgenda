@@ -311,3 +311,13 @@ async def test_automatic_fallback_with_pre_shared_secret_on_public_network(clien
     )
     assert res.status_code == 200
     assert res.json()["allowed"] is True
+
+
+@pytest.mark.asyncio
+async def test_pairing_challenge_requires_auth_when_fallback_disabled(client, monkeypatch):
+    from app.config import settings
+    monkeypatch.setattr(settings, 'allow_anonymous_fallback', False)
+    res = await client.post('/v1/auth/challenge')
+    assert res.status_code == 401
+    res = await client.post('/v1/auth/challenge', headers={'X-App-Key': settings.secret_key})
+    assert res.status_code == 401

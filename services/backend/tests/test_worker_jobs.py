@@ -22,12 +22,12 @@ async def auth_headers(client):
 @pytest.mark.asyncio
 async def test_job_document_extraction_flow(client, auth_headers):
     # 1. Cargar un documento a la bóveda (esto encola un job document_extraction)
-    content = b"%PDF-1.4 Extracted Text: Certificado Medico de Aptitud Fisica para el Paciente Pedro"
+    content = b"Certificado Medico de Aptitud Fisica para el Paciente Pedro"
     init_res = await client.post(
         "/v1/documents/uploads",
         json={
-            "filename": "certificado_medico.pdf",
-            "mime_type": "application/pdf",
+            "filename": "certificado_medico.txt",
+            "mime_type": "text/plain",
             "expected_size_bytes": len(content),
             "title": "Certificado Médico",
         },

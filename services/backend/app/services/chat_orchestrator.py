@@ -18,6 +18,9 @@ from app.models.chat import (
 )
 from app.models.proposal import AgentProposalModel, ProposalStatus
 from app.services.agenda_service import agenda_service
+from app.services.document_retrieval import (
+    document_retrieval, format_document_context, source_reference_appendix,
+)
 from app.services.llm_service import stream_chat_completion
 from app.services.prompt_builder import build_llm_messages
 from app.services.proposal_parser import extract_proposal_from_text
@@ -35,6 +38,7 @@ class ChatOrchestrator:
         user_id: str,
         device_id: Optional[str],
         req: CreateTurnRequest,
+        allow_document_context: bool = True,
     ) -> Tuple[ChatTurnResponse, bool]:
         """Crea un turno de chat durable o recupera el existente si coincide el client_message_id."""
         now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -83,6 +87,7 @@ class ChatOrchestrator:
                 date_str=req.date,
                 iana_timezone=req.timezone or "America/Mexico_City",
                 explicit_history=req.history,
+                allow_document_context=allow_document_context,
             )
         )
         self._active_tasks[turn_id] = task
@@ -104,6 +109,7 @@ class ChatOrchestrator:
         date_str: Optional[str],
         iana_timezone: str = "America/Mexico_City",
         explicit_history: Optional[List[ChatMessageModel]] = None,
+        allow_document_context: bool = True,
     ):
         """Ejecuta la generación en segundo plano sin depender del ciclo de vida del socket HTTP."""
         target_date = date_str or datetime.now().strftime("%Y-%m-%d")
@@ -177,12 +183,20 @@ class ChatOrchestrator:
                 )
                 user_msg_obj = user_msg_res.scalar_one_or_none()
                 user_message_text = user_msg_obj.content if user_msg_obj else ""
+                if allow_document_context:
+                    passages = await document_retrieval.search(
+                        session, user_id, user_message_text,
+                    )
+                    document_context = format_document_context(passages)
+                else:
+                    document_context = ""
 
             llm_messages = build_llm_messages(
                 current_date=target_date,
                 events=agenda_models,
                 user_message=user_message_text,
                 history=history_models,
+                document_context=document_context,
             )
 
             # 3. Stream de inferencia local
@@ -193,6 +207,16 @@ class ChatOrchestrator:
 
             # 4. Extraer posibles propuestas estructuradas
             proposal, clean_text = extract_proposal_from_text(full_response)
+            # Use only the complete records in the final budgeted source message.
+            # This deterministic index remains available after the prompt is gone.
+            source_appendix = (
+                source_reference_appendix(llm_messages[-2]["content"])
+                if allow_document_context and document_context and len(llm_messages) >= 3
+                else ""
+            )
+            if source_appendix:
+                full_response += source_appendix
+                await self._broadcast(turn_id, {"type": "token", "content": source_appendix})
             now = datetime.now(timezone.utc).replace(tzinfo=None)
 
             async with get_db_context() as session:

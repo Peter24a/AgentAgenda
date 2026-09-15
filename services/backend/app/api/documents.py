@@ -20,6 +20,17 @@ from app.services.document_storage import document_storage
 router = APIRouter(prefix="/v1/documents", tags=["documents"])
 
 
+@router.get("/search", summary="Buscar fragmentos documentales con procedencia")
+async def search_document_content(
+    q: str = Query(..., min_length=2, max_length=500),
+    limit: int = Query(5, ge=1, le=10),
+    session: AsyncSession = Depends(get_db_session),
+    auth: AuthContext = Depends(require_scope("documents:read")),
+):
+    from app.services.document_retrieval import search_documents
+    return {"results": await search_documents(session, auth.user_id, q, limit=limit)}
+
+
 @router.post(
     "/uploads",
     response_model=UploadSessionResponse,

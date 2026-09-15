@@ -149,7 +149,7 @@ class DocumentRevision(Base):
     version = Column(Integer, nullable=False, default=1)
     storage_path = Column(String(512), nullable=False)
     original_filename = Column(String(256), nullable=False)
-    mime_type = Column(String(64), nullable=False)
+    mime_type = Column(String(255), nullable=False)
     file_size_bytes = Column(Integer, nullable=False)
     sha256_hash = Column(String(64), nullable=False, index=True)
     extracted_text = Column(Text, nullable=True)
@@ -287,4 +287,28 @@ class AuditEvent(Base):
     user_id = Column(String(64), nullable=False, default="default_user", index=True)
     event_type = Column(String(64), nullable=False)
     details_json = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class ImportBatch(Base):
+    __tablename__ = "import_batches"
+    id = Column(String(64), primary_key=True)
+    user_id = Column(String(64), nullable=False, index=True)
+    source_collection = Column(String(128), nullable=False)
+    manifest_sha256 = Column(String(64), nullable=False)
+    status = Column(String(32), nullable=False, default="running")
+    report_json = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+
+
+class DocumentOrigin(Base):
+    __tablename__ = "document_origins"
+    document_id = Column(String(64), ForeignKey("documents.id"), primary_key=True)
+    source_collection = Column(String(128), nullable=False, index=True)
+    source_path = Column(Text, nullable=False)
+    privacy_class = Column(String(32), nullable=False)
+    source_kind = Column(String(32), nullable=False)
+    source_date = Column(String(64), nullable=True)
+    metadata_json = Column(JSON, nullable=True)
+    batch_id = Column(String(64), ForeignKey("import_batches.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

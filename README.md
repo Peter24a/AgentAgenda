@@ -496,3 +496,12 @@ AgentAgenda/
 Puntos de cambio: `models/chat.py` y `api_client.dart` para IDs/contratos temporales; migraciones y repositorios para persistencia; servicios `memory_service`, `document_service`, `context_engine` y `sync_service`; adaptador `device_context`; worker compartido y entrada MCP. Separar responsabilidades sin crear microservicios adicionales por cada tipo de memoria.
 
 Fundamento de la arquitectura: gestión externa de memoria, episodios con fuentes, afirmaciones temporales y evaluación de operaciones. MemGPT, Mem0, A-MEM, Zep, Hindsight, EverMemOS y LeanMem orientan el diseño; RuleMem/LifeMem quedan como investigación posterior. Las fuentes completas, neurociencia y dimensión social se conservan en el documento de investigación. No se han instalado esos sistemas ni ejecutado benchmarks del proyecto al consolidar este plan.
+
+## Actualización operativa: archivo personal (15 de septiembre de 2026)
+
+La conexión AIlauncher, el túnel HTTPS, la extracción documental real con OCR local,
+el worker automático, la importación por manifiesto y la recuperación documental
+en chat se describen en [Archivo personal: importación y consulta](docs/PERSONAL_IMPORT.md).
+Este flujo permite importar originales y PersonalLLM con procedencia, revisiones,
+selección SAFE/OPT_IN y exclusión de secretos. No implementa por sí solo toda la
+arquitectura de memoria, sincronización y recordatorios planteada arriba.

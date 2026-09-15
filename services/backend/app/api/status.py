@@ -1,4 +1,6 @@
 import os
+import json
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any, Dict
 from fastapi import APIRouter, Depends
@@ -8,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db_session
 from app.config import settings
+from app.services.llm_service import llm_headers
 from app.models.canonical import Job
 
 router = APIRouter(tags=["System Status"])
@@ -50,17 +53,26 @@ async def get_system_status(
     llm_info = {
         "model": settings.llm_model,
         "api_base": settings.llm_api_base,
-        "status": "configured",
+        "status": "offline",
     }
     try:
-        async with httpx.AsyncClient(timeout=1.0) as client:
-            resp = await client.get(f"{settings.llm_api_base}/models")
+        async with httpx.AsyncClient(timeout=3.0, headers=llm_headers()) as client:
+            resp = await client.get(settings.llm_health_url or f"{settings.llm_api_base.rstrip('/')}/models")
             if resp.status_code == 200:
                 llm_info["status"] = "online"
     except Exception:
-        llm_info["status"] = "offline_or_local"
+        llm_info["status"] = "offline"
 
-    overall_status = "healthy" if db_status == "connected" and storage_ok else "degraded"
+    worker_status = "offline"
+    try:
+        pulse = json.loads((Path(settings.storage_path) / "worker-heartbeat.json").read_text())
+        last_seen = datetime.fromisoformat(pulse["timestamp"])
+        if 0 <= (datetime.now(timezone.utc) - last_seen).total_seconds() < 30:
+            worker_status = "active"
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+
+    overall_status = "healthy" if db_status == "connected" and storage_ok and llm_info["status"] == "online" and worker_status == "active" else "degraded"
 
     return {
         "status": overall_status,
@@ -76,7 +88,7 @@ async def get_system_status(
             "path": settings.storage_path,
         },
         "worker": {
-            "status": "active",
+            "status": worker_status,
             "pending_jobs": pending_jobs,
         },
         "llm": llm_info,

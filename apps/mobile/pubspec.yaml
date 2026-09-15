@@ -39,6 +39,8 @@ dependencies:
   http: ^1.6.0
   shared_preferences: ^2.5.5
 dev_dependencies:
+  integration_test:
+    sdk: flutter
   flutter_test:
     sdk: flutter
 
