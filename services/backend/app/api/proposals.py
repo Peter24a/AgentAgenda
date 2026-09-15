@@ -2,16 +2,12 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_auth_optional, get_db_session
+from app.api.deps import get_db_session, require_scope
 from app.models.auth import AuthContext
 from app.models.proposal import AgentProposalModel, ProposalStatus, ProposalActionResponse
 from app.models.agenda import AgendaItemModel
 from app.services.proposal_service import proposal_service
-from app.db.database import (
-    get_latest_pending_proposal as get_sqlite_pending,
-    get_proposal as get_sqlite_proposal,
-    process_pending_proposal as process_sqlite_proposal,
-)
+
 
 router = APIRouter(prefix="/v1/proposals", tags=["Proposals"])
 
@@ -38,31 +34,26 @@ def _proposal_to_model(p) -> AgentProposalModel:
 @router.get("/pending", response_model=Optional[AgentProposalModel])
 async def get_pending_proposal(
     session: AsyncSession = Depends(get_db_session),
-    auth: Optional[AuthContext] = Depends(get_current_auth_optional),
+    auth: AuthContext = Depends(require_scope("agenda:read")),
 ):
-    user_id = auth.user_id if auth else "default_user"
+    user_id = auth.user_id
     # 1. Buscar en BD canónica
     prop = await proposal_service.get_latest_pending(session, user_id)
     if prop:
         return _proposal_to_model(prop)
-    # 2. Fallback a SQLite para retrocompatibilidad
-    return await get_sqlite_pending()
+    return None
 
 
 @router.get("/{proposal_id}", response_model=AgentProposalModel)
 async def get_single_proposal(
     proposal_id: str,
     session: AsyncSession = Depends(get_db_session),
-    auth: Optional[AuthContext] = Depends(get_current_auth_optional),
+    auth: AuthContext = Depends(require_scope("agenda:read")),
 ):
-    user_id = auth.user_id if auth else "default_user"
+    user_id = auth.user_id
     prop = await proposal_service.get_proposal(session, user_id, proposal_id)
     if prop:
         return _proposal_to_model(prop)
-
-    legacy_prop = await get_sqlite_proposal(proposal_id)
-    if legacy_prop:
-        return legacy_prop
 
     raise HTTPException(status_code=404, detail="Propuesta no encontrada")
 
@@ -71,9 +62,9 @@ async def get_single_proposal(
 async def create_proposal(
     proposal: AgentProposalModel,
     session: AsyncSession = Depends(get_db_session),
-    auth: Optional[AuthContext] = Depends(get_current_auth_optional),
+    auth: AuthContext = Depends(require_scope("agenda:write")),
 ):
-    user_id = auth.user_id if auth else "default_user"
+    user_id = auth.user_id
     saved = await proposal_service.save_proposal(session, user_id, proposal)
     return _proposal_to_model(saved)
 
@@ -82,65 +73,26 @@ async def create_proposal(
 async def confirm_proposal(
     proposal_id: str,
     session: AsyncSession = Depends(get_db_session),
-    auth: Optional[AuthContext] = Depends(get_current_auth_optional),
+    auth: AuthContext = Depends(require_scope("agenda:write")),
 ):
-    user_id = auth.user_id if auth else "default_user"
+    user_id = auth.user_id
     # 1. Si existe en la base canónica, aplicar con transacción atómica estricta
     canonical_prop = await proposal_service.get_proposal(session, user_id, proposal_id)
     if canonical_prop:
         return await proposal_service.confirm_proposal(session, user_id, proposal_id)
 
-    # 2. Fallback a SQLite
-    proposal, processed = await process_sqlite_proposal(
-        proposal_id, ProposalStatus.accepted
-    )
-    if not proposal:
-        raise HTTPException(status_code=404, detail="Propuesta no encontrada")
-
-    if not processed:
-        return ProposalActionResponse(
-            success=False,
-            proposal_id=proposal_id,
-            status=proposal.status,
-            message=f"La propuesta ya fue procesada anteriormente ({proposal.status.value})"
-        )
-
-    return ProposalActionResponse(
-        success=True,
-        proposal_id=proposal_id,
-        status=ProposalStatus.accepted,
-        message="Propuesta aceptada e integrada en tu agenda con éxito."
-    )
+    raise HTTPException(status_code=404, detail="Propuesta no encontrada")
 
 
 @router.post("/{proposal_id}/reject", response_model=ProposalActionResponse)
 async def reject_proposal(
     proposal_id: str,
     session: AsyncSession = Depends(get_db_session),
-    auth: Optional[AuthContext] = Depends(get_current_auth_optional),
+    auth: AuthContext = Depends(require_scope("agenda:write")),
 ):
-    user_id = auth.user_id if auth else "default_user"
+    user_id = auth.user_id
     canonical_prop = await proposal_service.get_proposal(session, user_id, proposal_id)
     if canonical_prop:
         return await proposal_service.reject_proposal(session, user_id, proposal_id)
 
-    proposal, processed = await process_sqlite_proposal(
-        proposal_id, ProposalStatus.rejected
-    )
-    if not proposal:
-        raise HTTPException(status_code=404, detail="Propuesta no encontrada")
-
-    if not processed:
-        return ProposalActionResponse(
-            success=False,
-            proposal_id=proposal_id,
-            status=proposal.status,
-            message=f"La propuesta ya fue procesada anteriormente ({proposal.status.value})"
-        )
-
-    return ProposalActionResponse(
-        success=True,
-        proposal_id=proposal_id,
-        status=ProposalStatus.rejected,
-        message="Propuesta descartada."
-    )
+    raise HTTPException(status_code=404, detail="Propuesta no encontrada")

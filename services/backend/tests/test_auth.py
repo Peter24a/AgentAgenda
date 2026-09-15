@@ -1,6 +1,7 @@
 import pytest
 from datetime import datetime, timedelta, timezone
 from fastapi import Depends
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
 from app.api.deps import require_scope
@@ -287,11 +288,9 @@ async def test_automatic_fallback_local_network(client):
 
 @pytest.mark.asyncio
 async def test_automatic_fallback_blocked_on_public_network(client):
-    # Simular petición anónima proveniente de IP pública en internet (ej. 148.213.1.200)
-    res = await client.get(
-        "/test/scope-agenda",
-        headers={"X-Forwarded-For": "148.213.1.200"},
-    )
+    # The transport supplies the peer address; XFF must not grant trust.
+    async with AsyncClient(transport=ASGITransport(app=app, client=("8.8.8.8", 40000)), base_url="http://test") as external:
+        res = await external.get("/test/scope-agenda", headers={"X-Forwarded-For": "127.0.0.1"})
     # Debe rechazar con 401 para evitar brechas de seguridad en internet
     assert res.status_code == 401
     assert "Acceso directo anónimo denegado desde red pública" in res.json()["detail"]
@@ -302,13 +301,8 @@ async def test_automatic_fallback_with_pre_shared_secret_on_public_network(clien
     from app.config import settings
 
     # Si viene de IP pública pero trae la clave de compilación (X-App-Key), se autoriza
-    res = await client.get(
-        "/test/scope-agenda",
-        headers={
-            "X-Forwarded-For": "148.213.1.200",
-            "X-App-Key": settings.secret_key,
-        },
-    )
+    async with AsyncClient(transport=ASGITransport(app=app, client=("8.8.8.8", 40000)), base_url="http://test") as external:
+        res = await external.get("/test/scope-agenda", headers={"X-App-Key": settings.secret_key})
     assert res.status_code == 200
     assert res.json()["allowed"] is True
 

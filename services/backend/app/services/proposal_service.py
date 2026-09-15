@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.canonical import Proposal, Event, ChangeBatch, SyncHead
 from app.models.proposal import AgentProposalModel, ProposalStatus, ProposalActionResponse
 from app.models.agenda import AgendaItemModel, ActivityCategory
+from app.services.agenda_service import agenda_service
 
 
 class ProposalService:
@@ -67,6 +68,7 @@ class ProposalService:
         self, session: AsyncSession, user_id: str, proposal_id: str
     ) -> ProposalActionResponse:
         """Acepta una propuesta aplicando atómicamente todos los eventos e incrementando sync_head."""
+        head = await agenda_service._lock_head(session, user_id)
         stmt = select(Proposal).where(
             Proposal.id == proposal_id, Proposal.user_id == user_id
         )
@@ -92,18 +94,6 @@ class ProposalService:
                 message=f"La propuesta ya fue procesada anteriormente ({prop.status})",
             )
 
-        # 1. Obtener sync_head
-        head_stmt = select(SyncHead).where(SyncHead.user_id == user_id)
-        if session.bind and session.bind.dialect.name == "postgresql":
-            head_stmt = head_stmt.with_for_update()
-        res_head = await session.execute(head_stmt)
-        head = res_head.scalar_one_or_none()
-        if not head:
-            head = SyncHead(user_id=user_id, current_seq=0)
-            session.add(head)
-            await session.flush()
-
-        current_seq = head.current_seq
         items = prop.resulting_items or []
 
         # 2. Aplicar cada item en la agenda
@@ -111,22 +101,25 @@ class ProposalService:
             item_id = it.get("id") or f"evt-{uuid.uuid4().hex[:8]}"
             start_dt = datetime.fromisoformat(it["start_time"]) if "start_time" in it else datetime.utcnow()
             end_dt = datetime.fromisoformat(it["end_time"]) if it.get("end_time") else None
-            if start_dt.tzinfo:
-                start_dt = start_dt.astimezone(timezone.utc).replace(tzinfo=None)
-            if end_dt and end_dt.tzinfo:
-                end_dt = end_dt.astimezone(timezone.utc).replace(tzinfo=None)
+            zone_name = it.get("timezone", "America/Mexico_City")
+            start_dt = agenda_service._utc_input(start_dt, zone_name)
+            end_dt = agenda_service._utc_input(end_dt, zone_name)
+            if end_dt and end_dt <= start_dt:
+                raise ValueError("El final debe ser posterior al inicio")
             cat = it.get("category", "general")
 
             evt_stmt = select(Event).where(Event.id == item_id, Event.user_id == user_id)
             res_evt = await session.execute(evt_stmt)
             evt = res_evt.scalar_one_or_none()
 
+            action = "update" if evt else "create"
             if evt:
                 evt.title = it.get("title", evt.title)
                 evt.description = it.get("description", evt.description)
                 evt.start_time = start_dt
                 evt.end_time = end_dt
                 evt.category = cat
+                evt.timezone = zone_name
                 evt.is_completed = bool(it.get("is_completed", False))
                 evt.is_deleted = False
                 evt.version += 1
@@ -151,21 +144,7 @@ class ProposalService:
                 session.add(evt)
                 new_ver = 1
 
-            # 3. Registrar lote de sincronización
-            current_seq += 1
-            head.current_seq = current_seq
-            change = ChangeBatch(
-                id=f"cb-prop-{uuid.uuid4().hex[:8]}",
-                user_id=user_id,
-                commit_seq=current_seq,
-                entity_type="event",
-                entity_id=item_id,
-                change_type="update" if evt else "create",
-                entity_version=new_ver,
-                payload_json=it,
-                created_at=datetime.utcnow(),
-            )
-            session.add(change)
+            agenda_service._record_change(session, head, evt, "event", action)
 
         # 4. Marcar propuesta como aceptada
         prop.status = "accepted"

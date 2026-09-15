@@ -37,9 +37,10 @@ class Settings(BaseSettings):
     
     # Fallback seguro para uso personal (Opción A vs Opción B)
     # Permite acceso directo transparente solo desde red local / privada sin exponer a internet público
-    allow_anonymous_fallback: bool = os.getenv("ALLOW_ANONYMOUS_FALLBACK", "true").lower() in ("true", "1", "yes")
+    allow_anonymous_fallback: bool = os.getenv("ALLOW_ANONYMOUS_FALLBACK", "false").lower() in ("true", "1", "yes")
     fallback_require_private_network: bool = os.getenv("FALLBACK_REQUIRE_PRIVATE_NETWORK", "true").lower() in ("true", "1", "yes")
     trusted_fallback_networks: str = os.getenv("TRUSTED_FALLBACK_NETWORKS", "private,loopback")
+    mcp_allowed_origins: str = ""
 
     class Config:
         env_file = ".env"

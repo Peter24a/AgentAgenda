@@ -1,4 +1,5 @@
 import ipaddress
+import hmac
 from typing import Callable, Optional
 from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -18,11 +19,9 @@ def is_client_network_trusted(request: Request) -> bool:
     if trusted_cfg == "*":
         return True
 
-    client_host = request.client.host if request.client else "127.0.0.1"
-    # Tomar la IP cliente original si hay proxy inverso
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        client_host = xff.split(",")[0].strip()
+    # Forwarded headers are client input here. Only the ASGI server, configured
+    # with explicit trusted proxies, may normalize request.client.
+    client_host = request.client.host if request.client else ""
 
     if client_host in ("localhost", "testclient", "test"):
         return True
@@ -34,7 +33,8 @@ def is_client_network_trusted(request: Request) -> bool:
             return False
         if "loopback" in trusted_cfg and ip.is_loopback:
             return True
-        if "private" in trusted_cfg and (ip.is_private or ip.is_link_local):
+        private_networks = ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7")
+        if "private" in trusted_cfg and any(ip in ipaddress.ip_network(net) for net in private_networks):
             return True
     except ValueError:
         pass
@@ -45,7 +45,7 @@ def is_client_network_trusted(request: Request) -> bool:
 def is_app_secret_valid(request: Request) -> bool:
     """Verifica si la petición incluye la clave precompartida de compilación (X-App-Key o X-App-Secret)."""
     app_key = request.headers.get("x-app-key") or request.headers.get("x-app-secret")
-    if app_key and settings.secret_key and app_key.strip() == settings.secret_key.strip():
+    if app_key and settings.secret_key and hmac.compare_digest(app_key.strip(), settings.secret_key.strip()):
         return True
     return False
 
@@ -150,6 +150,11 @@ async def get_current_device(
             detail="Se requiere un dispositivo registrado para realizar esta operación",
         )
     return auth
+
+
+def has_scope(auth: AuthContext, required_scope: str) -> bool:
+    scopes = set(auth.scopes or [])
+    return bool(scopes & {"*", "admin", required_scope, required_scope.split(":")[0] + ":*"})
 
 
 def require_scope(required_scope: str) -> Callable:

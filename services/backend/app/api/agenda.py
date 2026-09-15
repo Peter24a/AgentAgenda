@@ -1,4 +1,5 @@
 from datetime import datetime, timezone as dt_timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import hashlib
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -6,16 +7,12 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_auth_optional, get_db_session, require_scope
+from app.api.deps import get_db_session, require_scope
 from app.models.auth import AuthContext
 from app.models.agenda import AgendaItemModel, AgendaItemCreate, ActivityCategory
 from app.models.canonical import Event, Task, Memory
 from app.services.agenda_service import agenda_service
-from app.db.database import (
-    get_events_for_date as get_sqlite_events,
-    delete_event as delete_sqlite_event,
-    toggle_event as toggle_sqlite_event,
-)
+
 
 router = APIRouter(prefix="/v1/agenda", tags=["Agenda & Tasks"])
 
@@ -91,12 +88,25 @@ async def list_events(
     end_date: Optional[str] = Query(None, description="Fecha fin YYYY-MM-DD"),
     timezone: str = Query("America/Mexico_City", description="Zona horaria IANA"),
     session: AsyncSession = Depends(get_db_session),
-    auth: Optional[AuthContext] = Depends(get_current_auth_optional),
+    auth: AuthContext = Depends(require_scope("agenda:read")),
 ):
-    user_id = auth.user_id if auth else "default_user"
+    user_id = auth.user_id
     target_date = date
     if not date and not (start_date and end_date):
-        target_date = datetime.now().strftime("%Y-%m-%d")
+        try:
+            target_date = datetime.now(ZoneInfo(timezone)).strftime("%Y-%m-%d")
+        except (ValueError, ZoneInfoNotFoundError):
+            raise HTTPException(422, "Zona horaria inválida") from None
+
+    try:
+        ZoneInfo(timezone)
+        for value in (target_date, start_date, end_date):
+            if value is not None:
+                datetime.strptime(value, "%Y-%m-%d")
+        if bool(start_date) != bool(end_date) or (start_date and end_date and start_date > end_date):
+            raise ValueError()
+    except (ValueError, ZoneInfoNotFoundError):
+        raise HTTPException(422, "Intervalo o zona horaria inválidos") from None
 
     events = await agenda_service.list_events(
         session=session,
@@ -106,14 +116,6 @@ async def list_events(
         end_date=end_date,
         timezone=timezone,
     )
-    if not events and target_date:
-        try:
-            legacy_events = await get_sqlite_events(target_date)
-            if legacy_events:
-                return legacy_events
-        except Exception:
-            pass
-
     return [_event_to_model(e) for e in events]
 
 
@@ -122,15 +124,18 @@ async def create_or_update_event(
     item: AgendaItemCreate,
     timezone: str = Query("America/Mexico_City", description="Zona horaria IANA"),
     session: AsyncSession = Depends(get_db_session),
-    auth: Optional[AuthContext] = Depends(get_current_auth_optional),
+    auth: AuthContext = Depends(require_scope("agenda:write")),
 ):
-    user_id = auth.user_id if auth else "default_user"
-    event = await agenda_service.upsert_event(
-        session=session,
-        user_id=user_id,
-        item=item,
-        timezone=timezone,
-    )
+    user_id = auth.user_id
+    try:
+        event = await agenda_service.upsert_event(
+            session=session,
+            user_id=user_id,
+            item=item,
+            timezone=timezone,
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
     return _event_to_model(event)
 
 
@@ -138,17 +143,11 @@ async def create_or_update_event(
 async def remove_event(
     event_id: str,
     session: AsyncSession = Depends(get_db_session),
-    auth: Optional[AuthContext] = Depends(get_current_auth_optional),
+    auth: AuthContext = Depends(require_scope("agenda:write")),
 ):
-    user_id = auth.user_id if auth else "default_user"
+    user_id = auth.user_id
     deleted = await agenda_service.delete_event(session, user_id, event_id)
     if not deleted:
-        try:
-            sqlite_deleted = await delete_sqlite_event(event_id)
-            if sqlite_deleted:
-                return {"success": True, "deleted_id": event_id}
-        except Exception:
-            pass
         raise HTTPException(status_code=404, detail="Evento no encontrado")
     return {"success": True, "deleted_id": event_id}
 
@@ -157,19 +156,12 @@ async def remove_event(
 async def toggle_event_completed(
     event_id: str,
     session: AsyncSession = Depends(get_db_session),
-    auth: Optional[AuthContext] = Depends(get_current_auth_optional),
+    auth: AuthContext = Depends(require_scope("agenda:write")),
 ):
-    user_id = auth.user_id if auth else "default_user"
+    user_id = auth.user_id
     updated = await agenda_service.toggle_event_completed(session, user_id, event_id)
     if updated:
         return _event_to_model(updated)
-
-    try:
-        legacy_updated = await toggle_sqlite_event(event_id)
-        if legacy_updated:
-            return legacy_updated
-    except Exception:
-        pass
 
     raise HTTPException(status_code=404, detail="Evento no encontrado")
 
@@ -178,9 +170,9 @@ async def toggle_event_completed(
 async def list_tasks(
     status: Optional[str] = Query(None, description="pending, completed, all"),
     session: AsyncSession = Depends(get_db_session),
-    auth: Optional[AuthContext] = Depends(get_current_auth_optional),
+    auth: AuthContext = Depends(require_scope("agenda:read")),
 ):
-    user_id = auth.user_id if auth else "default_user"
+    user_id = auth.user_id
     tasks = await agenda_service.list_tasks(session, user_id, status=status)
     return [
         {
@@ -200,9 +192,9 @@ async def list_tasks(
 async def toggle_task_completed(
     task_id: str,
     session: AsyncSession = Depends(get_db_session),
-    auth: Optional[AuthContext] = Depends(get_current_auth_optional),
+    auth: AuthContext = Depends(require_scope("agenda:write")),
 ):
-    user_id = auth.user_id if auth else "default_user"
+    user_id = auth.user_id
     updated = await agenda_service.toggle_task_completed(session, user_id, task_id)
     if not updated:
         raise HTTPException(status_code=404, detail="Tarea no encontrada")

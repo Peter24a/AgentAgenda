@@ -7,6 +7,14 @@ from app.models.canonical import Base
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
+
+@pytest.fixture(autouse=True)
+def synthetic_local_pairing(monkeypatch):
+    # Legacy tests bootstrap synthetic identities locally; production defaults
+    # to explicit authentication. Auth regression tests override this setting.
+    from app.config import settings
+    monkeypatch.setattr(settings, "allow_anonymous_fallback", True)
+
 @pytest_asyncio.fixture(scope="function")
 async def test_engine():
     engine = create_async_engine(
