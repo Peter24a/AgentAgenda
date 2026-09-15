@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -111,6 +111,10 @@ class ProposalService:
             item_id = it.get("id") or f"evt-{uuid.uuid4().hex[:8]}"
             start_dt = datetime.fromisoformat(it["start_time"]) if "start_time" in it else datetime.utcnow()
             end_dt = datetime.fromisoformat(it["end_time"]) if it.get("end_time") else None
+            if start_dt.tzinfo:
+                start_dt = start_dt.astimezone(timezone.utc).replace(tzinfo=None)
+            if end_dt and end_dt.tzinfo:
+                end_dt = end_dt.astimezone(timezone.utc).replace(tzinfo=None)
             cat = it.get("category", "general")
 
             evt_stmt = select(Event).where(Event.id == item_id, Event.user_id == user_id)

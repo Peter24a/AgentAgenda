@@ -505,3 +505,7 @@ en chat se describen en [Archivo personal: importación y consulta](docs/PERSONA
 Este flujo permite importar originales y PersonalLLM con procedencia, revisiones,
 selección SAFE/OPT_IN y exclusión de secretos. No implementa por sí solo toda la
 arquitectura de memoria, sincronización y recordatorios planteada arriba.
+
+La agenda incorpora vistas Día/Semana/Mes, actividad actual en carrusel y registro
+de actividades durante huecos del horario. La precarga autorizada y sus horas
+provisionales se documentan en [Horario personal](docs/SCHEDULE.md).

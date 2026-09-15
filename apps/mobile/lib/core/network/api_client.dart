@@ -151,6 +151,53 @@ class ApiClient {
     return [];
   }
 
+  /// Dates are local; end is exclusive. Surface failures instead of an empty agenda.
+  Future<List<AgendaItem>> getAgendaRange({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/v1/agenda/events').replace(
+      queryParameters: {
+        'start_date': DateFormat('yyyy-MM-dd').format(start),
+        'end_date': DateFormat('yyyy-MM-dd')
+            .format(end.subtract(const Duration(days: 1))),
+        'timezone': 'America/Mexico_City',
+      },
+    );
+    final response = await http
+        .get(uri, headers: _headers)
+        .timeout(const Duration(seconds: 12));
+    if (response.statusCode != 200) {
+      throw Exception('No se pudo cargar el horario (${response.statusCode}).');
+    }
+    return (jsonDecode(response.body) as List<dynamic>)
+        .map((e) => AgendaItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<bool> recordActivity({
+    required String requestId,
+    required String activity,
+    required DateTime observedAt,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/v1/agenda/check-ins'),
+            headers: _headers,
+            body: jsonEncode({
+              'request_id': requestId,
+              'activity': activity,
+              'observed_at': observedAt.toUtc().toIso8601String(),
+            }),
+          )
+          .timeout(const Duration(seconds: 12));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Crea o actualiza un evento en la agenda canónica.
   Future<AgendaItem?> createOrUpdateEvent(AgendaItem item) async {
     final uri = Uri.parse('$_baseUrl/v1/agenda/events');

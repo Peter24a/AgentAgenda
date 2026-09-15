@@ -35,6 +35,19 @@ void main() {
         isTrue,
       );
       expect(answer.contains('[D1]'), isTrue);
+      // Supply archive-specific expectations privately, never as test fixtures.
+      const expectedTerms = String.fromEnvironment('EXPECTED_ANSWER_TERMS');
+      final body = answer
+          .split('Fuentes disponibles para esta respuesta')
+          .first
+          .toLowerCase();
+      for (final term in expectedTerms.split('|').where((e) => e.isNotEmpty)) {
+        expect(
+          body.contains(term.toLowerCase()),
+          isTrue,
+          reason: 'The answer must contain the expected documentary facts.',
+        );
+      }
     }
     expect(
       events.whereType<ChatTokenEvent>().map((e) => e.token).join().trim(),

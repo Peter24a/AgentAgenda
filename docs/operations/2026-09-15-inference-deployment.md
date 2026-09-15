@@ -129,3 +129,38 @@ El exportador BuildKit del host falló por una instantánea padre ausente. Se pu
 construir la imagen con `DOCKER_BUILDKIT=0 docker build -t agentagenda-backend:local
 services/backend` desde la raíz del repositorio y luego ejecutar Compose sin
 `--build`. No se reinició Docker ni se tocaron los contenedores de otras apps.
+
+## Horario y vistas de calendario
+
+Tras autorización expresa se activó el plan vigente desde el 15 de septiembre:
+70 sesiones, 150 horas, hasta el 23 de noviembre. Son bloques de estudio y
+desarrollo profesional con tareas y objetivos del archivo; las horas provisionales
+son 19:00 en días laborables y 09:00 en fin de semana. La rutina aporta subbloques
+dentro de esas sesiones, sin duplicar su duración. No se inventaron turnos de
+trabajo, clases, sueño ni comidas.
+
+El preview confirmó cero conflictos; la aplicación creó los 70 eventos y 70
+cambios de sincronización en una transacción. Copia PostgreSQL previa en
+`~/AgentAgenda-backups/20260915-schedule/`. Plan privado en
+`~/AgentAgenda-imports/20260915/schedule-plan.json`, fuera de Git.
+
+El móvil incorpora Día/Semana/Mes, carrusel centrado en la actividad vigente,
+navegación mes → semana → día y tarjeta de check-in durante huecos. La primera
+respuesta al check-in se guarda como observación fechada; el chat puede recuperar
+esas observaciones con el alcance correspondiente. Las fechas de agenda y
+propuestas se normalizan a UTC y se presentan en hora local.
+
+Se corrigió también la selección documental para preguntas compuestas: el ruido
+de instrucciones sobre citas ya no desplaza los conceptos de la consulta.
+La consulta real sobre carrera y posgrado obtuvo los dos hechos esperados, citas
+en el cuerpo y fuentes persistidas, sin propuestas ni errores (19,04 s en esa
+muestra). Esta comprobación se hizo con la sesión del Pixel contra el endpoint
+público, después de corregir una primera respuesta que se abstuvo por falta de
+fragmentos adecuados.
+
+Validación acotada de esta ampliación: 8 pruebas de importación/check-in/horas
+pasan, comprobaciones de recuperación documental pasan, analyzer de agenda sin
+problemas y APK normal compilado e instalado en el Pixel. Se conservó el trabajo
+paralelo de formato Markdown del chat.
+
+Operación y límites de la precarga: [SCHEDULE.md](../SCHEDULE.md).

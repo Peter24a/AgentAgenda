@@ -1,264 +1,175 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'beam_settings_sheet.dart';
-import 'week_strip_selector.dart';
 
-/// Encabezado estilo At a Glance con despliegue animado y fluido del calendario.
-/// Optimizado con AnimatedSize y curvas nativas M3 sin costo de GPU.
-class AgendaHeader extends StatefulWidget {
+import '../../models/agenda_view.dart';
+import 'beam_settings_sheet.dart';
+
+class AgendaHeader extends StatelessWidget {
   final DateTime selectedDate;
+  final AgendaView view;
   final int totalActivities;
   final int completedActivities;
-  final Function(DateTime) onDateChanged;
-  final VoidCallback? onAddActivity;
+  final ValueChanged<AgendaView> onViewChanged;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+  final VoidCallback onToday;
+  final VoidCallback onAddActivity;
 
   const AgendaHeader({
     super.key,
     required this.selectedDate,
+    required this.view,
     required this.totalActivities,
     required this.completedActivities,
-    required this.onDateChanged,
-    this.onAddActivity,
+    required this.onViewChanged,
+    required this.onPrevious,
+    required this.onNext,
+    required this.onToday,
+    required this.onAddActivity,
   });
 
-  @override
-  State<AgendaHeader> createState() => _AgendaHeaderState();
-}
-
-class _AgendaHeaderState extends State<AgendaHeader> {
-  bool _isCalendarExpanded = false;
-
-  void _toggleCalendar() {
-    HapticFeedback.selectionClick();
-    setState(() => _isCalendarExpanded = !_isCalendarExpanded);
-  }
-
-  void _openSettings(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => const BeamSettingsSheet(),
-    );
+  String get _periodTitle {
+    if (view == AgendaView.month) {
+      return DateFormat('MMMM yyyy', 'es').format(selectedDate);
+    }
+    if (view == AgendaView.week) {
+      final start = agendaWeekStart(selectedDate);
+      final end = DateTime(start.year, start.month, start.day + 6);
+      return '${DateFormat('d MMM', 'es').format(start)} – ${DateFormat('d MMM', 'es').format(end)}';
+    }
+    return DateFormat('EEEE d', 'es').format(selectedDate);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    final dayName = DateFormat('EEEE', 'es').format(widget.selectedDate);
-    final formattedDate = DateFormat("d 'de' MMMM", 'es').format(widget.selectedDate);
-    final capitalizedDay = dayName[0].toUpperCase() + dayName.substring(1);
-
-    final progress = widget.totalActivities > 0
-        ? widget.completedActivities / widget.totalActivities
-        : 0.0;
-
+    final title = _periodTitle;
+    final progress = totalActivities == 0
+        ? 0.0
+        : completedActivities / totalActivities;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 26, 20, 8),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Barra superior: Píldora de Fecha + Estado 30B + Tuerca de Ajustes
           Row(
             children: [
-              // Botón desplegable del calendario con efecto táctil
-              InkWell(
-                onTap: _toggleCalendar,
-                borderRadius: BorderRadius.circular(20),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 240),
-                  curve: Curves.easeOutCubic,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _isCalendarExpanded
-                        ? theme.colorScheme.primaryContainer
-                        : theme.colorScheme.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.calendar_today_rounded,
-                        size: 15,
-                        color: _isCalendarExpanded
-                            ? theme.colorScheme.onPrimaryContainer
-                            : theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Hoy',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: _isCalendarExpanded
-                              ? theme.colorScheme.onPrimaryContainer
-                              : theme.colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      // Rotación animada de la flecha indicadora
-                      AnimatedRotation(
-                        turns: _isCalendarExpanded ? 0.5 : 0.0,
-                        duration: const Duration(milliseconds: 260),
-                        curve: Curves.easeInOutCubicEmphasized,
-                        child: Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          size: 18,
-                          color: _isCalendarExpanded
-                              ? theme.colorScheme.onPrimaryContainer
-                              : theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+              Expanded(
+                child: Text(
+                  'Tu agenda',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
-              const Spacer(),
-
-              // Estado del Agente local
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
+              TextButton(onPressed: onToday, child: const Text('Hoy')),
+              IconButton.filledTonal(
+                onPressed: onAddActivity,
+                icon: const Icon(Icons.add_rounded),
+                tooltip: 'Agregar actividad',
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                onPressed: () => showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) => const BeamSettingsSheet(),
                 ),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF1E2A38)
-                      : const Color(0xFFE8F0FE),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: const Color(0xFF4285F4).withValues(alpha: 0.3),
+                icon: const Icon(Icons.tune_rounded),
+                tooltip: 'Personalizar apariencia',
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<AgendaView>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: AgendaView.day, label: Text('Día')),
+                ButtonSegment(value: AgendaView.week, label: Text('Semana')),
+                ButtonSegment(value: AgendaView.month, label: Text('Mes')),
+              ],
+              selected: {view},
+              onSelectionChanged: (selection) => onViewChanged(selection.first),
+              style: SegmentedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                side: BorderSide(
+                  color: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.6,
                   ),
                 ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
+              ),
+            ),
+          ),
+          const SizedBox(height: 22),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.circle,
-                      size: 8,
-                      color: Color(0xFF34A853),
-                    ),
-                    SizedBox(width: 6),
                     Text(
-                      '30B Local',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF4285F4),
+                      '${title[0].toUpperCase()}${title.substring(1)}',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.7,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      view == AgendaView.day
+                          ? DateFormat('MMMM yyyy', 'es').format(selectedDate)
+                          : view == AgendaView.week
+                          ? 'Toca un día para ver sus actividades'
+                          : 'Elige una semana o un día',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (widget.onAddActivity != null) ...[
-                IconButton.filledTonal(
-                  onPressed: widget.onAddActivity,
-                  icon: const Icon(Icons.add_rounded, size: 20),
-                  tooltip: 'Nueva actividad',
-                  style: IconButton.styleFrom(
-                    backgroundColor: theme.colorScheme.surfaceContainerHigh,
-                    minimumSize: const Size(38, 38),
-                    padding: EdgeInsets.zero,
+              IconButton(
+                onPressed: onPrevious,
+                icon: const Icon(Icons.chevron_left_rounded),
+                tooltip: 'Periodo anterior',
+              ),
+              IconButton(
+                onPressed: onNext,
+                icon: const Icon(Icons.chevron_right_rounded),
+                tooltip: 'Periodo siguiente',
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '$totalActivities ${totalActivities == 1 ? 'actividad' : 'actividades'}',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(width: 8),
-              ],
-
-              // Tuerca de configuración
-              IconButton.filledTonal(
-                onPressed: () => _openSettings(context),
-                icon: const Icon(Icons.tune_rounded, size: 20),
-                tooltip: 'Personalizar lazo luminoso',
-                style: IconButton.styleFrom(
-                  backgroundColor: theme.colorScheme.surfaceContainerHigh,
-                  minimumSize: const Size(38, 38),
-                  padding: EdgeInsets.zero,
+              ),
+              Text(
+                '$completedActivities completadas',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.primary,
                 ),
               ),
             ],
           ),
-
-          // Despliegue animado fluido de la tira semanal del calendario
-          AnimatedSize(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOutCubicEmphasized,
-            child: _isCalendarExpanded
-                ? Padding(
-                    padding: const EdgeInsets.only(top: 14),
-                    child: WeekStripSelector(
-                      selectedDate: widget.selectedDate,
-                      onDateSelected: (date) {
-                        HapticFeedback.lightImpact();
-                        widget.onDateChanged(date);
-                      },
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
-
-          const SizedBox(height: 18),
-
-          // Título del día y fecha
-          Text(
-            capitalizedDay,
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.5,
-              color: theme.colorScheme.onSurface,
-            ),
-          ),
-          Text(
-            formattedDate,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Píldora de progreso
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? theme.colorScheme.surfaceContainer
-                  : theme.colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(22),
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: CircularProgressIndicator(
-                    value: progress,
-                    strokeWidth: 3.5,
-                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      theme.colorScheme.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    widget.totalActivities == 0
-                        ? 'Esperando planificación del Agente'
-                        : widget.completedActivities == widget.totalActivities
-                            ? '¡Todo listo por hoy! 🎉'
-                            : '${widget.completedActivities} de ${widget.totalActivities} completadas',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                ),
-              ],
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 4,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              semanticsLabel: 'Progreso de actividades',
+              semanticsValue: '$completedActivities de $totalActivities',
             ),
           ),
         ],

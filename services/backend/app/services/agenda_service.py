@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from typing import Any, Dict, List, Optional
 import pytz
 from sqlalchemy import select, and_, or_
@@ -22,7 +22,7 @@ class AgendaService:
 
         dt = datetime.strptime(date_str, "%Y-%m-%d")
         local_start = tz.localize(datetime.combine(dt.date(), time.min))
-        local_end = tz.localize(datetime.combine(dt.date(), time.max))
+        local_end = tz.localize(datetime.combine(dt.date() + timedelta(days=1), time.min))
 
         utc_start = local_start.astimezone(pytz.UTC).replace(tzinfo=None)
         utc_end = local_end.astimezone(pytz.UTC).replace(tzinfo=None)
@@ -41,13 +41,13 @@ class AgendaService:
 
         if date:
             utc_start, utc_end = self._parse_date_range(date, timezone)
-            conditions.append(Event.start_time >= utc_start)
-            conditions.append(Event.start_time <= utc_end)
+            conditions.append(or_(Event.end_time > utc_start, and_(Event.end_time.is_(None), Event.start_time >= utc_start)))
+            conditions.append(Event.start_time < utc_end)
         elif start_date and end_date:
             utc_start, _ = self._parse_date_range(start_date, timezone)
             _, utc_end = self._parse_date_range(end_date, timezone)
-            conditions.append(Event.start_time >= utc_start)
-            conditions.append(Event.start_time <= utc_end)
+            conditions.append(or_(Event.end_time > utc_start, and_(Event.end_time.is_(None), Event.start_time >= utc_start)))
+            conditions.append(Event.start_time < utc_end)
 
         stmt = select(Event).where(and_(*conditions)).order_by(Event.start_time.asc())
         res = await session.execute(stmt)
@@ -70,6 +70,11 @@ class AgendaService:
         timezone: str = "America/Mexico_City",
     ) -> Event:
         event_id = item.id or f"evt-{uuid.uuid4().hex[:8]}"
+        # PostgreSQL stores UTC without tzinfo; clients send explicit offsets.
+        item = item.model_copy(update={
+            'start_time': item.start_time.astimezone(pytz.UTC).replace(tzinfo=None) if item.start_time.tzinfo else item.start_time,
+            'end_time': item.end_time.astimezone(pytz.UTC).replace(tzinfo=None) if item.end_time and item.end_time.tzinfo else item.end_time,
+        })
         stmt = select(Event).where(Event.id == event_id, Event.user_id == user_id)
         res = await session.execute(stmt)
         event = res.scalar_one_or_none()

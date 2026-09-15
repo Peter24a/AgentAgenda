@@ -8,6 +8,7 @@ import json
 import math
 import re
 import unicodedata
+from collections import Counter
 from dataclasses import dataclass
 from typing import Optional
 
@@ -34,6 +35,43 @@ sin sobre soy su sus te tengo tiene tienen todo todos tu tus un una unas uno uno
 y ya the a an and are as at be by do for from how i in is it my of on or that the
 this to was what when where which who with you your
 """.split())
+
+_QUERY_FILLER = {
+    "segun", "documento", "documentos", "archivo", "archivos", "fuente", "fuentes",
+    "informacion", "son", "saber", "sabes", "podrias", "puedes", "quiero", "necesito",
+}
+# Generic vocabulary, independent of the imported person's facts. These groups
+# bridge common wording differences and define facets of compound questions.
+_TERM_GROUPS = (
+    {"carrera", "carreras", "estudio", "estudios", "estudiar", "estudiando", "educacion", "formacion", "licenciatura"},
+    {"posgrado", "posgrados", "postgrado", "postgrados", "maestria", "maestrias", "doctorado", "doctorados", "master", "phd"},
+    {"meta", "metas", "objetivo", "objetivos", "aspiracion", "aspiraciones"},
+)
+_TERM_FACET = {term: f"concept-{index}" for index, group in enumerate(_TERM_GROUPS) for term in group}
+
+
+def _query_weights(query: str) -> dict[str, float]:
+    # Citation/format instructions are not the subject being searched. Keep an
+    # actual appointment query ("mi cita médica") intact.
+    subject = re.sub(
+        r"(?:^|(?<=[.!?]))\s*(?:cita\s+(?:las\s+)?fuentes|"
+        r"incluye\s+(?:las\s+)?(?:fuentes|referencias)|"
+        r"no\s+(?:crees|generes|hagas)\s+propuestas|"
+        r"distingue\s+(?:la\s+)?informaci[oó]n)[^.!?]*[.!?]?",
+        " ", query, flags=re.I,
+    )
+    primary = terms(subject) - _QUERY_FILLER
+    normalized = normalize(query)
+    if any(phrase in normalized for phrase in (
+        "quien soy", "sobre mi", "sabes de mi", "mi perfil", "mis datos",
+    )):
+        primary.update({"perfil", "identidad", "contexto", "maestro"})
+    weights = {term: 1.0 for term in primary}
+    for group in _TERM_GROUPS:
+        if primary & group:
+            for term in group:
+                weights.setdefault(term, 0.55)
+    return weights
 
 
 def estimate_tokens(text: str) -> int:
@@ -102,8 +140,12 @@ class DocumentPassage:
 
 def _chunks(text: str, size: int = 1100):
     """Keep page/section labels; never invent page numbers for plain text."""
+    # Import metadata has already been preserved in DocumentOrigin. YAML labels
+    # describe the file, and should not displace the actual factual paragraphs.
+    text = re.sub(r"\A\ufeff?---\s*\n.*?\n---\s*(?:\n|\Z)", "", text, count=1, flags=re.S)
     page = None
     heading = None
+    heading_stack: list[tuple[int, str]] = []
     lines: list[str] = []
     length = 0
 
@@ -116,15 +158,19 @@ def _chunks(text: str, size: int = 1100):
     # Extractors emit explicit PDF markers, whereas DOCX/Markdown has sections.
     for line in text.splitlines():
         page_match = re.fullmatch(r"\s*\[P[aá]gina\s+(\d+)\]\s*", line, flags=re.I)
-        section_match = re.match(r"^\s{0,3}#{1,6}\s+(.+)", line)
+        section_match = re.match(r"^\s{0,3}(#{1,6})\s+(.+)", line)
         if page_match or section_match:
             chunk = flush()
             if chunk:
                 yield chunk, page, heading
             if page_match:
                 page, heading = int(page_match.group(1)), None
+                heading_stack = []
             else:
-                heading = section_match.group(1).strip()[:200]
+                level = len(section_match.group(1))
+                heading_stack = [(depth, title) for depth, title in heading_stack if depth < level]
+                heading_stack.append((level, section_match.group(2).strip()))
+                heading = " / ".join(title for _, title in heading_stack)[-300:]
             continue
         # Long single lines (JSON exports, OCR paragraphs) must be searchable
         # beyond their beginning, without overflowing one retrieved excerpt.
@@ -156,13 +202,13 @@ class DocumentRetrievalService:
         *,
         limit: int = 5,
     ) -> list[DocumentPassage]:
-        query_terms = terms(query)
-        normalized_query = normalize(query)
-        if any(phrase in normalized_query for phrase in (
-            "quien soy", "sobre mi", "sabes de mi", "mi perfil", "mis datos",
-        )):
-            query_terms.update({"perfil", "identidad", "contexto", "maestro"})
-        if not query_terms:
+        query_weights = _query_weights(query)
+        query_terms = set(query_weights)
+        current_education = bool(re.search(
+            r"\bcarrera\s+estudio\b|\b(?:carrera|formacion|educacion)\s+actual\b",
+            normalize(query),
+        ))
+        if not query_terms or limit <= 0:
             return []
 
         latest = aliased(DocumentRevision)
@@ -192,23 +238,69 @@ class DocumentRetrievalService:
             .options(noload(Document.revisions), noload(DocumentRevision.document))
         )
         rows = (await session.execute(stmt)).all()
-        candidates: list[DocumentPassage] = []
+        # Count occurrence per document, so ubiquitous archive vocabulary cannot
+        # beat the rarer terms that actually identify the requested information.
+        document_frequency: Counter = Counter()
+        documents = []
         for doc, revision, origin in rows:
             title_terms = terms(f"{doc.title} {doc.alias or ''} {revision.original_filename}")
+            chunks = [(text, page, heading, terms(text), terms(heading or ""))
+                      for text, page, heading in _chunks(revision.extracted_text)]
+            all_terms = set(title_terms)
+            for _, _, _, body_terms, heading_terms in chunks:
+                all_terms.update(body_terms)
+                all_terms.update(heading_terms)
+            document_frequency.update(query_terms & all_terms)
+            documents.append((doc, revision, origin, title_terms, chunks))
+        weights = {
+            term: weight * (1 + math.log((len(rows) + 1) / (document_frequency[term] + 1)))
+            for term, weight in query_weights.items()
+        }
+
+        def facet_weights(hits):
+            result = {}
+            for term in hits:
+                facet = _TERM_FACET.get(term, term)
+                result[facet] = max(result.get(facet, 0), weights[term])
+            return result
+
+        candidates = []
+        for doc, revision, origin, title_terms, chunks in documents:
             title_hits = query_terms & title_terms
-            for text, page, heading in _chunks(revision.extracted_text):
-                text_terms = terms(text)
-                body_hits = query_terms & text_terms
-                heading_hits = query_terms & terms(heading or "")
+            for text, page, heading, body_terms, heading_terms in chunks:
+                # A list of links to other files is provenance, not an answer to
+                # the question. Its repeated filenames otherwise outrank facts.
+                leaf_heading = normalize((heading or "").split(" / ")[-1]).strip()
+                if re.match(r"^(?:fuentes|referencias|enlaces|documentos relacionados|documentos de soporte|historial de cambios)(?:\b|$)", leaf_heading):
+                    continue
+                body_hits = query_terms & body_terms
+                heading_hits = query_terms & heading_terms
                 if not (body_hits or title_hits or heading_hits):
                     continue
-                score = (
-                    4 * len(body_hits)
-                    + 2 * len(title_hits)
-                    + 3 * len(heading_hits)
-                    + 5 * len(body_hits) / len(query_terms)
-                )
-                candidates.append(DocumentPassage(
+                body_facets = facet_weights(body_hits)
+                title_facets = facet_weights(title_hits)
+                heading_facets = facet_weights(heading_hits)
+                leaf_facets = facet_weights(query_terms & terms(leaf_heading))
+                facet_scores = {
+                    facet: (
+                        4 * body_facets.get(facet, 0)
+                        + 3 * title_facets.get(facet, 0)
+                        + 2 * heading_facets.get(facet, 0)
+                        + 8 * leaf_facets.get(facet, 0)
+                    )
+                    for facet in body_facets.keys() | title_facets.keys() | heading_facets.keys()
+                }
+                if current_education and "concept-0" in facet_scores:
+                    if re.search(r"\b(?:actual|vigente|curso)\b", leaf_heading):
+                        facet_scores["concept-0"] *= 1.5
+                    elif re.search(r"\b(?:futuro|futuros|aspiraciones|posgrado|metas|planes)\b", leaf_heading):
+                        facet_scores["concept-0"] *= 0.5
+                score = sum(facet_scores.values())
+                if origin and origin.source_kind == "canonical":
+                    # Explicitly curated personal records have more authority
+                    # for personal questions than generic reference material.
+                    score *= 1.75
+                passage = DocumentPassage(
                     document_id=doc.id, revision_id=revision.id,
                     version=revision.version, title=doc.title,
                     filename=revision.original_filename, text=text, page=page,
@@ -217,22 +309,53 @@ class DocumentRetrievalService:
                     source_date=origin.source_date if origin else None,
                     source_kind=origin.source_kind if origin else None,
                     score=score,
-                ))
+                )
+                candidates.append((passage, facet_weights(body_hits | heading_hits | title_hits), facet_scores))
 
         # Prefer diverse evidence, avoiding repeated copies of the same excerpt.
-        candidates.sort(key=lambda item: (-item.score, item.document_id, item.page or 0))
         result: list[DocumentPassage] = []
         per_document: dict[str, int] = {}
         seen_text: set[str] = set()
-        for passage in candidates:
+        covered_facets: set[str] = set()
+
+        def include(candidate):
+            passage, facets, _ = candidate
             key = normalize(passage.text).strip()
             if key in seen_text or per_document.get(passage.document_id, 0) >= 2:
-                continue
+                return False
             seen_text.add(key)
             result.append(passage)
+            covered_facets.update(facets)
             per_document[passage.document_id] = per_document.get(passage.document_id, 0) + 1
+            return True
+
+        # First answer each part on its own merits. A goals passage mentioning
+        # "career" should not consume the slot needed for the actual degree.
+        requested_facets = {_TERM_FACET.get(term, term) for term, weight in query_weights.items() if weight == 1}
+        personal_question = bool(re.search(r"\b(?:mi|mis|personal|soy)\b", normalize(query)))
+        for facet in sorted(requested_facets):
             if len(result) >= limit:
                 break
+            eligible = [item for item in candidates if facet in item[2]]
+            if not eligible:
+                continue
+            eligible.sort(key=lambda item: (
+                -(personal_question and item[0].source_kind == "canonical"),
+                -item[2][facet], -item[0].score, item[0].document_id,
+            ))
+            for item in eligible:
+                if include(item):
+                    candidates.remove(item)
+                    break
+
+        while candidates and len(result) < limit:
+            # Give the unaddressed part of a compound question a chance before
+            # taking more excerpts about a facet already well represented.
+            candidates.sort(key=lambda item: (
+                -(item[0].score + 3 * sum(weight for facet, weight in item[1].items() if facet not in covered_facets)),
+                item[0].document_id, item[0].page or 0,
+            ))
+            include(candidates.pop(0))
         return result
 
 

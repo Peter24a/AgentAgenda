@@ -1,12 +1,15 @@
-from datetime import datetime
+from datetime import datetime, timezone as dt_timezone
+import hashlib
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field, field_validator
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_auth_optional, get_db_session
+from app.api.deps import get_current_auth_optional, get_db_session, require_scope
 from app.models.auth import AuthContext
 from app.models.agenda import AgendaItemModel, AgendaItemCreate, ActivityCategory
-from app.models.canonical import Event, Task
+from app.models.canonical import Event, Task, Memory
 from app.services.agenda_service import agenda_service
 from app.db.database import (
     get_events_for_date as get_sqlite_events,
@@ -23,11 +26,62 @@ def _event_to_model(e: Event) -> AgendaItemModel:
         id=e.id,
         title=e.title,
         description=e.description,
-        start_time=e.start_time,
-        end_time=e.end_time,
+        start_time=e.start_time.replace(tzinfo=dt_timezone.utc),
+        end_time=e.end_time.replace(tzinfo=dt_timezone.utc) if e.end_time else None,
         category=ActivityCategory(cat),
         is_completed=e.is_completed,
     )
+
+
+class ActivityCheckIn(BaseModel):
+    request_id: str = Field(min_length=1, max_length=100)
+    activity: str = Field(min_length=1, max_length=2000)
+    observed_at: datetime
+
+    @field_validator('activity')
+    @classmethod
+    def nonempty_activity(cls, value):
+        if not value.strip():
+            raise ValueError('Describe la actividad')
+        return value.strip()
+
+    @field_validator('observed_at')
+    @classmethod
+    def explicit_timezone(cls, value):
+        if value.tzinfo is None:
+            raise ValueError('La fecha debe incluir zona horaria')
+        return value
+
+
+@router.post('/check-ins', summary='Recordar una actividad declarada por el usuario')
+async def record_activity(
+    req: ActivityCheckIn,
+    session: AsyncSession = Depends(get_db_session),
+    auth: AuthContext = Depends(require_scope('memory:write')),
+):
+    memory_id = 'mem-activity-' + hashlib.sha256((auth.user_id + '\0' + req.request_id).encode()).hexdigest()[:40]
+    observed = req.observed_at.astimezone(dt_timezone.utc).replace(tzinfo=None)
+    existing = await session.get(Memory, memory_id)
+    if existing:
+        if existing.value != req.activity or existing.valid_from != observed or existing.status != 'active':
+            raise HTTPException(409, 'El registro ya existe con otro contenido o fue retirado')
+        return {'memory_id': memory_id, 'status': 'recorded'}
+    now = datetime.now(dt_timezone.utc).replace(tzinfo=None)
+    session.add(Memory(
+        id=memory_id, user_id=auth.user_id, memory_type='episodic',
+        predicate='activity_check_in', value=req.activity,
+        context_text='Actividad declarada al responder al chat durante un hueco del horario.',
+        source_kind='phone', status='active', valid_from=observed, valid_to=observed,
+        version=1, created_at=now, updated_at=now,
+    ))
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        existing = await session.get(Memory, memory_id)
+        if not existing or existing.value != req.activity or existing.valid_from != observed or existing.status != 'active':
+            raise HTTPException(409, 'Conflicto al guardar la actividad')
+    return {'memory_id': memory_id, 'status': 'recorded'}
 
 
 @router.get("/events", response_model=List[AgendaItemModel])

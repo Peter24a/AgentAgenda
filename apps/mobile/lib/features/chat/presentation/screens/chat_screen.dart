@@ -21,7 +21,15 @@ class ChatMessage {
 
 /// Pantalla del chat de asistencia conectada con el LLM autohosteado.
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  final String? initialPrompt;
+  final bool checkIn;
+  final DateTime? agendaDate;
+  const ChatScreen({
+    super.key,
+    this.initialPrompt,
+    this.checkIn = false,
+    this.agendaDate,
+  });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -31,6 +39,9 @@ class _ChatScreenState extends State<ChatScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   bool _isGenerating = false;
+  late bool _checkInPending;
+  DateTime? _checkInObservedAt;
+  String? _checkInActivity;
 
   final List<ChatMessage> _messages = [
     ChatMessage(
@@ -43,6 +54,10 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _checkInPending = widget.checkIn;
+    if (!widget.checkIn && widget.initialPrompt != null) {
+      _controller.text = widget.initialPrompt!;
+    }
     _loadHistory();
   }
 
@@ -71,8 +86,7 @@ class _ChatScreenState extends State<ChatScreen> {
           if (_messages.isEmpty) {
             _messages.add(
               ChatMessage(
-                text:
-                    '¡Hola! Soy tu asistente de agenda. Puedo ayudarte a reorganizar tus horas, resolver conflictos o planear tu día.',
+                text: '¡Hola! Soy tu asistente de agenda. Puedo ayudarte a reorganizar tus horas, resolver conflictos o planear tu día.',
                 isUser: false,
                 timestamp: DateTime.now(),
               ),
@@ -82,6 +96,20 @@ class _ChatScreenState extends State<ChatScreen> {
         _scrollToBottom();
       }
     } catch (_) {}
+    if (mounted && widget.checkIn) {
+      setState(() {
+        _messages.add(
+          ChatMessage(
+            text:
+                'Ahora hay un espacio libre en tu horario. ¿Qué estás haciendo? '
+                'Tu respuesta quedará guardada con la hora para recordar cómo fue tu día.',
+            isUser: false,
+            timestamp: DateTime.now(),
+          ),
+        );
+      });
+      _scrollToBottom();
+    }
   }
 
   @override
@@ -106,6 +134,35 @@ class _ChatScreenState extends State<ChatScreen> {
   void _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _isGenerating) return;
+
+    if (_checkInPending) {
+      if (_checkInActivity != text) {
+        _checkInObservedAt = DateTime.now();
+        _checkInActivity = text;
+      }
+      setState(() => _isGenerating = true);
+      final saved = await ApiClient.instance.recordActivity(
+        requestId: 'phone-${_checkInObservedAt!.microsecondsSinceEpoch}',
+        activity: text,
+        observedAt: _checkInObservedAt!,
+      );
+      if (!mounted) return;
+      if (!saved) {
+        setState(() => _isGenerating = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No se pudo guardar la actividad. Tu respuesta sigue aquí; vuelve a enviar.',
+            ),
+          ),
+        );
+        return;
+      }
+      _checkInPending = false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Actividad guardada en tu memoria.')),
+      );
+    }
 
     _controller.clear();
     setState(() {
@@ -132,6 +189,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final stream = ApiClient.instance.streamChat(
         message: text,
         history: history,
+        date: widget.agendaDate,
       );
 
       await for (final event in stream) {
@@ -197,7 +255,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
                 Text(
-                  'Qwen 27B Autohosteado',
+                  'Tu horario y contexto personal',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.primary,
                     fontWeight: FontWeight.w600,
@@ -311,7 +369,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       decoration: InputDecoration(
                         hintText: _isGenerating
                             ? 'Generando respuesta...'
-                            : 'Pide reorganizar o consulta...',
+                            : (_checkInPending
+                                  ? '¿Qué estás haciendo ahora?'
+                                  : 'Pide reorganizar o consulta...'),
                         filled: true,
                         fillColor: theme.colorScheme.surfaceContainerHighest
                             .withValues(alpha: 0.5),
