@@ -1,272 +1,192 @@
-import json
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+"""Read-only MCP tools shared by a stateless Streamable HTTP endpoint."""
+from datetime import datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
+from typing import Any
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.canonical import Document, Event, Memory, Task
-from app.models.memory import ContextAssembleRequest
+from app.api.deps import has_scope
+from app.models.canonical import Document, Event
+from app.models.memory import ContextAssembleRequest, MemorySearchRequest
 from app.services.context_engine import context_engine
+from app.services.context_visibility import safe_document_filters
+from app.services.memory_service import memory_service
 from app.services.preparation_service import preparation_service
 
+PROTOCOL_VERSION = "2025-06-18"
+SUPPORTED_VERSIONS = {PROTOCOL_VERSION, "2025-03-26"}
 
-MCP_TOOLS_DEFINITIONS = [
-    {
-        "name": "get_personal_context",
-        "description": "Obtiene el bloque de contexto personal canónico optimizado (eventos del día, tareas pendientes y memorias vigentes respetando límite de tokens).",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "purpose": {"type": "string", "description": "Propósito de la interacción (ej. general_chat, agenda_planning)"},
-                "token_budget": {"type": "integer", "description": "Presupuesto máximo de tokens", "default": 2048},
-                "as_of": {"type": "string", "description": "Fecha y hora de referencia ISO 8601"},
-            },
-        },
-    },
-    {
-        "name": "query_agenda",
-        "description": "Consulta eventos y citas programadas en un rango de fechas.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "from_date": {"type": "string", "description": "Fecha inicial ISO 8601 (ej. 2026-09-15)"},
-                "to_date": {"type": "string", "description": "Fecha final ISO 8601 (ej. 2026-09-20)"},
-            },
-        },
-    },
-    {
-        "name": "search",
-        "description": "Busca recuerdos, preferencias y compromisos por palabras clave.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "Término de búsqueda"},
-                "limit": {"type": "integer", "default": 20},
-            },
-            "required": ["query"],
-        },
-    },
-    {
-        "name": "search_documents",
-        "description": "Busca documentos catalogados en la bóveda privada (título, emisor, titular, tipo).",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "Texto a buscar en metadatos"},
-                "doc_type": {"type": "string", "description": "Categoría documental (fiscal, identificacion, etc.)"},
-            },
-        },
-    },
-    {
-        "name": "get_event_preparation",
-        "description": "Consulta el estado de preparación y requisitos documentales de una cita específica.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "event_id": {"type": "string", "description": "ID del evento o cita"},
-            },
-            "required": ["event_id"],
-        },
-    },
-]
+
+class Arguments(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+
+class ContextArguments(Arguments):
+    purpose: str = Field("external_agent", max_length=200)
+    token_budget: int = Field(2048, ge=256, le=8192)
+    as_of: str | None = None
+    timezone: str = "America/Mexico_City"
+
+
+class AgendaArguments(Arguments):
+    from_date: str | None = None
+    to_date: str | None = None
+    limit: int = Field(100, ge=1, le=500)
+    timezone: str = "America/Mexico_City"
+
+
+class SearchArguments(Arguments):
+    query: str = Field(min_length=1, max_length=500)
+    limit: int = Field(20, ge=1, le=100)
+
+
+class DocumentArguments(Arguments):
+    query: str = Field("", max_length=500)
+    doc_type: str | None = Field(None, max_length=64)
+
+
+class PreparationArguments(Arguments):
+    event_id: str = Field(min_length=1, max_length=64)
+
+
+TOOLS = {
+    "get_personal_context": (ContextArguments, ("memory:read", "agenda:read", "tasks:read"), "Consulta contexto vigente y acotado. Las fuentes documentales deben ser SAFE."),
+    "query_agenda": (AgendaArguments, ("agenda:read",), "Consulta hasta 31 días de agenda. Fechas sin hora se interpretan en timezone; to_date incluye ese día."),
+    "search": (SearchArguments, ("memory:read", "agenda:read"), "Busca memorias vigentes y eventos por texto, con límite explícito."),
+    "search_documents": (DocumentArguments, ("documents:read",), "Busca metadatos de documentos explícitamente SAFE, sin originales ni texto extraído."),
+    "get_event_preparation": (PreparationArguments, ("agenda:read", "documents:read"), "Consulta requisitos de preparación de un evento propio."),
+}
+
+
+def result_text(text):
+    return {"content": [{"type": "text", "text": text}]}
+
+
+def rpc_error(req_id, code, message):
+    return {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}}
+
+
+def parse_time(value, zone):
+    parsed = datetime.fromisoformat(value)
+    return (parsed if parsed.tzinfo else parsed.replace(tzinfo=zone)).astimezone(timezone.utc).replace(tzinfo=None)
 
 
 class MCPServer:
-    def get_tool_definitions(self) -> List[Dict[str, Any]]:
-        return MCP_TOOLS_DEFINITIONS
+    def get_tool_definitions(self, auth):
+        return [{"name": name, "description": description,
+                 "inputSchema": schema.model_json_schema(),
+                 "annotations": {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False}}
+                for name, (schema, scopes, description) in TOOLS.items()
+                if all(has_scope(auth, scope) for scope in scopes)]
 
-    async def call_tool(
-        self,
-        session: AsyncSession,
-        user_id: str,
-        tool_name: str,
-        arguments: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    async def call_tool(self, session, auth, tool_name, arguments):
+        if tool_name not in TOOLS:
+            raise ValueError("Herramienta desconocida")
+        schema, scopes, _ = TOOLS[tool_name]
+        if not all(has_scope(auth, scope) for scope in scopes):
+            return {"isError": True, **result_text("Permiso insuficiente para esta herramienta")}
+        args = schema.model_validate(arguments)
+        user_id = auth.user_id
         if tool_name == "get_personal_context":
-            purpose = arguments.get("purpose", "external_agent")
-            budget = arguments.get("token_budget", 2048)
-            as_of = None
-            if arguments.get("as_of"):
-                try:
-                    as_of = datetime.fromisoformat(arguments["as_of"])
-                except Exception:
-                    pass
-
-            req = ContextAssembleRequest(
-                purpose=purpose,
-                token_budget=budget,
-                as_of=as_of,
-                include_agenda=True,
-                include_memories=True,
+            zone = ZoneInfo(args.timezone)
+            as_of = datetime.fromisoformat(args.as_of) if args.as_of else None
+            if as_of and as_of.tzinfo is None:
+                as_of = as_of.replace(tzinfo=zone)
+            req = ContextAssembleRequest(purpose=args.purpose, token_budget=args.token_budget,
+                                         as_of=as_of, timezone=args.timezone)
+            response = await context_engine.assemble_context(session, user_id, req)
+            return result_text(response.assembled_context)
+        if tool_name == "query_agenda":
+            zone = ZoneInfo(args.timezone)
+            today = datetime.now(zone).date()
+            start = parse_time(args.from_date or today.isoformat(), zone)
+            if args.to_date:
+                end = parse_time(args.to_date, zone)
+                if len(args.to_date) == 10:
+                    end += timedelta(days=1)
+            else:
+                end = start + timedelta(days=7)
+            if end <= start or end - start > timedelta(days=31):
+                raise ValueError("El intervalo debe ser positivo y no superar 31 días")
+            events = (await session.scalars(select(Event).where(
+                Event.user_id == user_id, Event.is_deleted.is_(False),
+                Event.start_time >= start, Event.start_time < end,
+            ).order_by(Event.start_time.asc()).limit(args.limit + 1))).all()
+            lines = [f"Eventos (límite {args.limit}; hay más: {len(events) > args.limit}):"]
+            for event in events[:args.limit]:
+                clock = event.start_time.replace(tzinfo=timezone.utc).astimezone(zone).isoformat()
+                lines.append(f"- ID: {event.id} | [{clock}] {event.title} ({event.description or ''})")
+            return result_text("\n".join(lines))
+        if tool_name == "search":
+            query = args.query.strip()
+            if not query:
+                raise ValueError("query no puede estar vacío")
+            memories, _ = await memory_service.search_memories(
+                session, user_id, MemorySearchRequest(query=query, limit=args.limit), for_model=True,
             )
-            resp = await context_engine.assemble_context(session, user_id, req)
-            return {"content": [{"type": "text", "text": resp.assembled_context}]}
-
-        elif tool_name == "query_agenda":
-            from_date = arguments.get("from_date")
-            to_date = arguments.get("to_date")
-            filters = [Event.user_id == user_id, Event.is_deleted.is_(False)]
-            if from_date:
-                try:
-                    filters.append(Event.start_time >= datetime.fromisoformat(from_date))
-                except Exception:
-                    pass
-            if to_date:
-                try:
-                    filters.append(Event.start_time <= datetime.fromisoformat(to_date))
-                except Exception:
-                    pass
-
-            stmt = select(Event).where(*filters).order_by(Event.start_time.asc())
-            res = await session.execute(stmt)
-            events = list(res.scalars().all())
-
-            text_lines = [f"Se encontraron {len(events)} eventos:"]
-            for ev in events:
-                time_str = ev.start_time.strftime("%Y-%m-%d %H:%M") if ev.start_time else "Sin fecha"
-                text_lines.append(f"- ID: {ev.id} | [{time_str}] {ev.title} {f'({ev.description})' if ev.description else ''}")
-
-            return {"content": [{"type": "text", "text": "\n".join(text_lines)}]}
-
-        elif tool_name == "search":
-            query = arguments.get("query", "").strip()
             pattern = f"%{query}%"
-
-            # Buscar en memorias
-            mem_stmt = (
-                select(Memory)
-                .where(
-                    Memory.user_id == user_id,
-                    Memory.status == "active",
-                    (Memory.predicate.ilike(pattern) | Memory.value.ilike(pattern)),
-                )
-                .limit(arguments.get("limit", 20))
-            )
-            mem_res = await session.execute(mem_stmt)
-            mems = list(mem_res.scalars().all())
-
-            # Buscar en eventos
-            ev_stmt = (
-                select(Event)
-                .where(
-                    Event.user_id == user_id,
-                    Event.is_deleted.is_(False),
-                    (Event.title.ilike(pattern) | Event.description.ilike(pattern)),
-                )
-                .limit(arguments.get("limit", 20))
-            )
-            ev_res = await session.execute(ev_stmt)
-            events = list(ev_res.scalars().all())
-
-            lines = [f"Resultados de búsqueda para '{query}':"]
-            if mems:
-                lines.append("\nMemorias:")
-                for m in mems:
-                    lines.append(f"- [{m.predicate}]: {m.value}")
-            if events:
-                lines.append("\nEventos:")
-                for ev in events:
-                    lines.append(f"- {ev.title} ({ev.start_time})")
-
-            return {"content": [{"type": "text", "text": "\n".join(lines)}]}
-
-        elif tool_name == "search_documents":
-            query = arguments.get("query", "").strip()
-            doc_type = arguments.get("doc_type")
-            filters = [Document.user_id == user_id, Document.is_deleted.is_(False)]
-            if query:
-                pattern = f"%{query}%"
+            events = (await session.scalars(select(Event).where(
+                Event.user_id == user_id, Event.is_deleted.is_(False),
+                Event.title.ilike(pattern) | Event.description.ilike(pattern),
+            ).order_by(Event.start_time.desc()).limit(args.limit))).all()
+            lines = [f"Resultados (máximo {args.limit} por categoría):"]
+            lines += [context_engine.memory_line(memory) for memory in memories]
+            lines += [f"- {event.title} ({event.start_time} UTC)" for event in events]
+            return result_text("\n".join(lines))
+        if tool_name == "search_documents":
+            filters = list(safe_document_filters(user_id))
+            if args.query.strip():
+                pattern = f"%{args.query.strip()}%"
                 filters.append(Document.title.ilike(pattern) | Document.issuer.ilike(pattern))
-            if doc_type:
-                filters.append(Document.doc_type == doc_type)
+            if args.doc_type:
+                filters.append(Document.doc_type == args.doc_type)
+            documents = (await session.scalars(select(Document).where(*filters).order_by(Document.title).limit(20))).all()
+            return result_text("\n".join([f"Documentos SAFE (máximo 20): {len(documents)}"] + [
+                f"- [{doc.id}] {doc.title} (Tipo: {doc.doc_type}, Emisor: {doc.issuer})" for doc in documents
+            ]))
+        prep = await preparation_service.get_event_preparation(session, user_id, args.event_id)
+        if prep is None:
+            return {"isError": True, **result_text("Evento no encontrado")}
+        return result_text("\n".join([f"Preparación para: {prep.event_title}"] + [
+            f"- Requisito: {item.title}" for item in prep.requirements
+        ]))
 
-            stmt = select(Document).where(*filters).limit(20)
-            res = await session.execute(stmt)
-            docs = list(res.scalars().all())
-
-            lines = [f"Encontrados {len(docs)} documentos:"]
-            for d in docs:
-                lines.append(f"- [{d.id}] {d.title} (Tipo: {d.doc_type}, Emisor: {d.issuer})")
-
-            return {"content": [{"type": "text", "text": "\n".join(lines)}]}
-
-        elif tool_name == "get_event_preparation":
-            event_id = arguments.get("event_id")
-            prep = await preparation_service.get_event_preparation(session, user_id, event_id)
-            if not prep:
-                return {"isError": True, "content": [{"type": "text", "text": f"Evento '{event_id}' no encontrado"}]}
-
-            lines = [
-                f"Preparación para: {prep.event_title}",
-                f"Estado de preparación: {prep.readiness_status}",
-                f"Requisitos totales: {prep.total_requirements}",
-                f"Verificados: {prep.verified_count} | Candidatos: {prep.candidate_count} | Faltantes: {prep.missing_count} | Vencidos: {prep.expired_count}",
-            ]
-            for r in prep.requirements:
-                lines.append(f"- Requisito: {r.title} [{r.status}]")
-
-            return {"content": [{"type": "text", "text": "\n".join(lines)}]}
-
-        else:
-            return {"isError": True, "content": [{"type": "text", "text": f"Herramienta desconocida: '{tool_name}'"}]}
-
-    async def handle_jsonrpc(
-        self, session: AsyncSession, user_id: str, request_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def handle_jsonrpc(self, session, auth, request_data: Any):
+        if not isinstance(request_data, dict):
+            return rpc_error(None, -32600, "Se requiere una petición JSON-RPC individual")
         req_id = request_data.get("id")
-        method = request_data.get("method")
-        params = request_data.get("params") or {}
-
+        if (request_data.get("jsonrpc") != "2.0" or not isinstance(request_data.get("method"), str)
+                or ("id" in request_data and (type(req_id) not in (str, int)))
+                or not isinstance(request_data.get("params", {}), dict)):
+            return rpc_error(None, -32600, "Petición JSON-RPC inválida")
+        method = request_data["method"]
+        params = request_data.get("params", {})
+        if "id" not in request_data:
+            # Notifications have no JSON-RPC response, including unknown ones.
+            return None
         if method == "initialize":
-            return {
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "result": {
-                    "protocolVersion": "2024-11-05",
-                    "serverInfo": {
-                        "name": "agentagenda-mcp",
-                        "version": "1.0.0",
-                    },
-                    "capabilities": {
-                        "tools": {"listChanged": False},
-                    },
-                },
-            }
-
-        elif method == "notifications/initialized":
-            return {}
-
-        elif method == "ping":
-            return {"jsonrpc": "2.0", "id": req_id, "result": {}}
-
+            if (not isinstance(params.get("protocolVersion"), str)
+                    or not isinstance(params.get("clientInfo"), dict)
+                    or not isinstance(params.get("capabilities"), dict)):
+                return rpc_error(req_id, -32602, "Parámetros initialize inválidos")
+            offered = params["protocolVersion"]
+            return {"jsonrpc": "2.0", "id": req_id, "result": {
+                "protocolVersion": offered if offered in SUPPORTED_VERSIONS else PROTOCOL_VERSION,
+                "serverInfo": {"name": "agentagenda-mcp", "version": "1.1.0"},
+                "capabilities": {"tools": {"listChanged": False}},
+            }}
+        if method == "ping":
+            result = {}
         elif method == "tools/list":
-            return {
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "result": {
-                    "tools": self.get_tool_definitions(),
-                },
-            }
-
+            result = {"tools": self.get_tool_definitions(auth)}
         elif method == "tools/call":
-            tool_name = params.get("name")
-            arguments = params.get("arguments") or {}
-            result = await self.call_tool(session, user_id, tool_name, arguments)
-            return {
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "result": result,
-            }
-
+            try:
+                result = await self.call_tool(session, auth, params.get("name"), params.get("arguments", {}))
+            except (ValueError, TypeError, KeyError, ValidationError):
+                return rpc_error(req_id, -32602, "Nombre o argumentos de herramienta inválidos")
         else:
-            return {
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "error": {
-                    "code": -32601,
-                    "message": f"Método no encontrado: '{method}'",
-                },
-            }
+            return rpc_error(req_id, -32601, "Método no encontrado")
+        return {"jsonrpc": "2.0", "id": req_id, "result": result}
 
 
 mcp_server = MCPServer()

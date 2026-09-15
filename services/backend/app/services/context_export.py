@@ -1,11 +1,14 @@
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.canonical import Document, Event, Memory, Task
+from app.services.context_visibility import safe_document_filters
+from app.services.memory_service import memory_service
+from app.models.memory import MemorySearchRequest
 
 
 class ContextExportService:
@@ -14,7 +17,7 @@ class ContextExportService:
         session: AsyncSession,
         user_id: str,
         export_format: str = "json",
-        include_documents: bool = True,
+        include_documents: bool = False,
         as_of: Optional[datetime] = None,
     ) -> Dict[str, Any]:
         ref_time = as_of or datetime.now(timezone.utc).replace(tzinfo=None)
@@ -63,13 +66,9 @@ class ContextExportService:
         ]
 
         # 3. Memorias activas
-        mem_stmt = (
-            select(Memory)
-            .where(Memory.user_id == user_id, Memory.status == "active")
-            .order_by(Memory.predicate.asc())
+        memories, memories_total = await memory_service.search_memories(
+            session, user_id, MemorySearchRequest(as_of=ref_time, limit=200), for_model=True,
         )
-        mem_res = await session.execute(mem_stmt)
-        memories = list(mem_res.scalars().all())
         memories_data = [
             {
                 "id": m.id,
@@ -78,6 +77,9 @@ class ContextExportService:
                 "value": m.value,
                 "context_text": m.context_text,
                 "version": m.version,
+                "valid_from": m.valid_from.isoformat() if m.valid_from else None,
+                "valid_to": m.valid_to.isoformat() if m.valid_to else None,
+                "sources": [{"source_kind": source.source_kind, "source_id": source.source_id} for source in m.sources],
             }
             for m in memories
         ]
@@ -87,7 +89,7 @@ class ContextExportService:
         if include_documents:
             doc_stmt = (
                 select(Document)
-                .where(Document.user_id == user_id, Document.is_deleted.is_(False))
+                .where(*safe_document_filters(user_id))
                 .order_by(Document.title.asc())
             )
             doc_res = await session.execute(doc_stmt)
@@ -107,10 +109,14 @@ class ContextExportService:
 
         # Ensamblar payload canónico
         payload = {
-            "schema_version": "1.0",
+            "schema_version": "1.1",
             "user_id": user_id,
             "exported_at": now_iso,
             "as_of": ref_time.isoformat(),
+            "valid_until": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            "purpose": "selected_context_copy",
+            "restorable_backup": False,
+            "memory_results_truncated": memories_total > len(memories),
             "events_count": len(events_data),
             "tasks_count": len(tasks_data),
             "memories_count": len(memories_data),
@@ -128,7 +134,7 @@ class ContextExportService:
         if export_format.lower() == "markdown":
             md_lines = [
                 f"# DOSSIER DE CONTEXTO CANÓNICO - AGENTAGENDA",
-                f"> Exportado el: `{now_iso}` | Usuario: `{user_id}` | Integridad SHA-256: `{sha256_digest[:16]}...`\n",
+                f"> Exportado el: `{now_iso}` | Usuario: `{user_id}` | Copia de contexto, no respaldo restaurable.\n",
                 f"## 1. Memoria Fáctica y Preferencias ({len(memories_data)})",
             ]
             for m in memories_data:
@@ -152,17 +158,20 @@ class ContextExportService:
                 for d in documents_data:
                     md_lines.append(f"- **{d['title']}** | Tipo: {d['doc_type']} | Emisor: {d['issuer'] or 'N/A'}")
 
-            md_lines.append(f"\n---\n*Firma de Integridad Criptográfica*: `SHA256:{sha256_digest}`")
+            content = "\n".join(md_lines)
+            markdown_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
             return {
                 "format": "markdown",
-                "sha256": sha256_digest,
+                "sha256": markdown_hash,
+                "hash_target": "content_utf8",
                 "exported_at": now_iso,
-                "content": "\n".join(md_lines),
+                "content": content,
             }
 
         return {
             "format": "json",
             "sha256": sha256_digest,
+            "hash_target": "json.dumps(data, sort_keys=True, ensure_ascii=False).encode('utf-8')",
             "exported_at": now_iso,
             "data": payload,
         }

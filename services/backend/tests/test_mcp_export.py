@@ -29,7 +29,8 @@ async def test_mcp_protocol_handshake_and_tools_list(client, auth_headers):
         "id": 1,
         "method": "initialize",
         "params": {
-            "protocolVersion": "2024-11-05",
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
             "clientInfo": {"name": "Codex-Agent", "version": "1.0"},
         },
     }
@@ -156,4 +157,4 @@ async def test_canonical_context_export(client, auth_headers):
     md_data = md_res.json()
     assert md_data["format"] == "markdown"
     assert "DOSSIER DE CONTEXTO CANÓNICO" in md_data["content"]
-    assert f"SHA256:{md_data['sha256']}" in md_data["content"]
+    assert hashlib.sha256(md_data["content"].encode("utf-8")).hexdigest() == md_data["sha256"]
