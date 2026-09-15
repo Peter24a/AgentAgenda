@@ -96,6 +96,7 @@ class SyncBootstrapResponse(BaseModel):
     events: List[Dict[str, Any]] = Field(default_factory=list)
     tasks: List[Dict[str, Any]] = Field(default_factory=list)
     proposals: List[Dict[str, Any]] = Field(default_factory=list)
+    memories: List[Dict[str, Any]] = Field(default_factory=list)
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 

@@ -139,6 +139,8 @@ class SyncService:
             return await self._apply_task_op(session, user_id, op)
         elif op.entity_type == "proposal":
             return await self._apply_proposal_op(session, user_id, op)
+        elif op.entity_type == "memory":
+            return await self._apply_memory_op(session, user_id, op)
         else:
             return (
                 OperationResult(
@@ -492,6 +494,157 @@ class SyncService:
             error_message="Acción no soportada en propuestas"
         ), None, None
 
+    async def _apply_memory_op(
+        self, session: AsyncSession, user_id: str, op: SyncOperation
+    ) -> Tuple[OperationResult, Optional[int], Optional[Dict[str, Any]]]:
+        stmt = select(Memory).where(Memory.id == op.entity_id, Memory.user_id == user_id)
+        res = await session.execute(stmt)
+        mem = res.scalar_one_or_none()
+
+        if op.action == "create":
+            if op.base_version != 0:
+                return OperationResult(
+                    operation_id=op.operation_id,
+                    entity_id=op.entity_id,
+                    entity_type="memory",
+                    status="rejected",
+                    error_message="Creación exige base_version=0",
+                ), None, None
+
+            if mem and mem.status == "active":
+                return OperationResult(
+                    operation_id=op.operation_id,
+                    entity_id=op.entity_id,
+                    entity_type="memory",
+                    status="conflict",
+                    new_version=mem.version,
+                    error_message="La memoria ya existe en el servidor",
+                    current_server_state={"predicate": mem.predicate, "value": mem.value, "version": mem.version},
+                ), None, None
+
+            now = datetime.utcnow()
+            valid_from = datetime.fromisoformat(op.payload["valid_from"]) if op.payload.get("valid_from") else None
+            valid_to = datetime.fromisoformat(op.payload["valid_to"]) if op.payload.get("valid_to") else None
+
+            if mem:
+                mem.memory_type = op.payload.get("memory_type", "semantic")
+                mem.predicate = op.payload.get("predicate", "fact")
+                mem.value = op.payload.get("value", "")
+                mem.context_text = op.payload.get("context_text")
+                mem.source_kind = op.payload.get("source_kind", "manual")
+                mem.status = "active"
+                mem.valid_from = valid_from
+                mem.valid_to = valid_to
+                mem.version += 1
+                mem.updated_at = now
+            else:
+                mem = Memory(
+                    id=op.entity_id,
+                    user_id=user_id,
+                    memory_type=op.payload.get("memory_type", "semantic"),
+                    predicate=op.payload.get("predicate", "fact"),
+                    value=op.payload.get("value", ""),
+                    context_text=op.payload.get("context_text"),
+                    source_kind=op.payload.get("source_kind", "manual"),
+                    status="active",
+                    valid_from=valid_from,
+                    valid_to=valid_to,
+                    version=1,
+                    created_at=now,
+                    updated_at=now,
+                )
+                session.add(mem)
+            await session.flush()
+            return OperationResult(
+                operation_id=op.operation_id,
+                entity_id=op.entity_id,
+                entity_type="memory",
+                status="applied",
+                new_version=mem.version,
+            ), mem.version, op.payload
+
+        elif op.action in ("update", "correct"):
+            if not mem:
+                return OperationResult(
+                    operation_id=op.operation_id,
+                    entity_id=op.entity_id,
+                    entity_type="memory",
+                    status="conflict",
+                    error_message="Memoria no encontrada para actualización",
+                ), None, None
+
+            if op.base_version != mem.version:
+                return OperationResult(
+                    operation_id=op.operation_id,
+                    entity_id=op.entity_id,
+                    entity_type="memory",
+                    status="conflict",
+                    new_version=mem.version,
+                    error_message=f"Conflicto de versión: base={op.base_version}, server={mem.version}",
+                    current_server_state={"predicate": mem.predicate, "value": mem.value, "version": mem.version},
+                ), None, None
+
+            if "value" in op.payload:
+                mem.value = op.payload["value"]
+            if "context_text" in op.payload:
+                mem.context_text = op.payload["context_text"]
+            if "predicate" in op.payload:
+                mem.predicate = op.payload["predicate"]
+            if "valid_to" in op.payload:
+                mem.valid_to = datetime.fromisoformat(op.payload["valid_to"]) if op.payload["valid_to"] else None
+
+            mem.version += 1
+            mem.updated_at = datetime.utcnow()
+            await session.flush()
+            return OperationResult(
+                operation_id=op.operation_id,
+                entity_id=op.entity_id,
+                entity_type="memory",
+                status="applied",
+                new_version=mem.version,
+            ), mem.version, op.payload
+
+        elif op.action in ("delete", "forget", "revoke"):
+            if not mem or mem.status == "revoked":
+                return OperationResult(
+                    operation_id=op.operation_id,
+                    entity_id=op.entity_id,
+                    entity_type="memory",
+                    status="applied",
+                    new_version=mem.version if mem else 1,
+                ), mem.version if mem else 1, {"status": "revoked"}
+
+            if op.base_version != mem.version:
+                return OperationResult(
+                    operation_id=op.operation_id,
+                    entity_id=op.entity_id,
+                    entity_type="memory",
+                    status="conflict",
+                    new_version=mem.version,
+                    error_message=f"Conflicto de versión: base={op.base_version}, server={mem.version}",
+                    current_server_state={"status": mem.status, "version": mem.version},
+                ), None, None
+
+            mem.status = "revoked"
+            mem.version += 1
+            mem.updated_at = datetime.utcnow()
+            await session.flush()
+            return OperationResult(
+                operation_id=op.operation_id,
+                entity_id=op.entity_id,
+                entity_type="memory",
+                status="applied",
+                new_version=mem.version,
+            ), mem.version, {"status": "revoked"}
+
+        return OperationResult(
+            operation_id=op.operation_id,
+            entity_id=op.entity_id,
+            entity_type="memory",
+            status="rejected",
+            error_message=f"Acción '{op.action}' no soportada en memorias",
+        ), None, None
+
     async def pull_changes(
         self,
         session: AsyncSession,
@@ -593,12 +746,33 @@ class SyncService:
             for p in prop_res.scalars().all()
         ]
 
+        # 4. Memorias activas
+        mems_res = await session.execute(
+            select(Memory).where(Memory.user_id == user_id, Memory.status == "active")
+        )
+        memories = [
+            {
+                "id": m.id,
+                "memory_type": m.memory_type,
+                "predicate": m.predicate,
+                "value": m.value,
+                "context_text": m.context_text,
+                "source_kind": m.source_kind,
+                "status": m.status,
+                "valid_from": m.valid_from.isoformat() if m.valid_from else None,
+                "valid_to": m.valid_to.isoformat() if m.valid_to else None,
+                "version": m.version,
+            }
+            for m in mems_res.scalars().all()
+        ]
+
         return SyncBootstrapResponse(
             sync_schema_version=1,
             watermark_seq=head.current_seq,
             events=events,
             tasks=tasks,
-            proposals=proposals
+            proposals=proposals,
+            memories=memories,
         )
 
     async def acknowledge(

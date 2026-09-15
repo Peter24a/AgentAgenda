@@ -28,10 +28,17 @@ class AgendaService:
         return head
 
     def _record_change(self, session, head, entity, entity_type, action):
-        fields = ("id", "title", "description", "start_time", "end_time", "timezone", "category", "is_completed", "is_deleted", "version") if entity_type == "event" else ("id", "title", "description", "status", "priority", "due_date", "is_deleted", "version")
+        if entity_type == "event":
+            fields = ("id", "title", "description", "start_time", "end_time", "timezone", "category", "is_completed", "is_deleted", "version")
+        elif entity_type == "task":
+            fields = ("id", "title", "description", "status", "priority", "due_date", "is_deleted", "version")
+        elif entity_type == "memory":
+            fields = ("id", "memory_type", "predicate", "value", "context_text", "source_kind", "status", "valid_from", "valid_to", "version")
+        else:
+            fields = ("id", "version")
         payload = {}
         for field in fields:
-            value = getattr(entity, field)
+            value = getattr(entity, field, None)
             payload[field] = value.isoformat() + "Z" if isinstance(value, datetime) else value
         head.current_seq += 1
         head.updated_at = datetime.utcnow()

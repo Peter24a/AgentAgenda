@@ -13,6 +13,7 @@ from app.models.memory import (
     MemorySearchRequest,
 )
 from app.services.context_visibility import memory_source_visibility
+from app.services.agenda_service import agenda_service
 
 
 class MemoryService:
@@ -54,6 +55,8 @@ class MemoryService:
             )
             session.add(src)
 
+        head = await agenda_service._lock_head(session, user_id)
+        agenda_service._record_change(session, head, memory, "memory", "create")
         await session.commit()
         await session.refresh(memory)
         return memory
@@ -200,6 +203,9 @@ class MemoryService:
             )
             session.add(src)
 
+        head = await agenda_service._lock_head(session, user_id)
+        agenda_service._record_change(session, head, old_mem, "memory", "update")
+        agenda_service._record_change(session, head, new_mem, "memory", "create")
         await session.commit()
         await session.refresh(new_mem)
         return new_mem
@@ -218,7 +224,10 @@ class MemoryService:
 
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         mem.status = "revoked"
+        mem.version += 1
         mem.updated_at = now
+        head = await agenda_service._lock_head(session, user_id)
+        agenda_service._record_change(session, head, mem, "memory", "delete")
         await session.commit()
         return True
 

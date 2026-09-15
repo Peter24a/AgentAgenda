@@ -321,3 +321,74 @@ async def test_operation_receipt_recovery_and_ack(client, auth_headers):
     )
     assert ack_res.status_code == 200
     assert ack_res.json()["acknowledged_seq"] == 5
+
+
+@pytest.mark.asyncio
+async def test_sync_push_and_bootstrap_memory(client, auth_headers):
+    # 1. Push create memory
+    push_res = await client.post(
+        "/v1/sync/push",
+        json={
+            "sync_schema_version": 1,
+            "operations": [
+                {
+                    "operation_id": "op-mem-01",
+                    "operation_epoch": "epoch-1",
+                    "entity_type": "memory",
+                    "entity_id": "mem-sync-1",
+                    "base_version": 0,
+                    "action": "create",
+                    "payload": {
+                        "memory_type": "semantic",
+                        "predicate": "wake_up_time",
+                        "value": "06:45",
+                        "context_text": "Preferencia declarada",
+                    },
+                }
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert push_res.status_code == 200
+    assert push_res.json()["results"][0]["status"] == "applied"
+    assert push_res.json()["results"][0]["new_version"] == 1
+
+    # 2. Bootstrap includes memory
+    boot = await client.post("/v1/sync/bootstrap", headers=auth_headers)
+    assert boot.status_code == 200
+    mems = boot.json()["memories"]
+    assert any(m["id"] == "mem-sync-1" and m["value"] == "06:45" for m in mems)
+
+    # 3. Push update memory
+    update_res = await client.post(
+        "/v1/sync/push",
+        json={
+            "sync_schema_version": 1,
+            "operations": [
+                {
+                    "operation_id": "op-mem-02",
+                    "operation_epoch": "epoch-1",
+                    "entity_type": "memory",
+                    "entity_id": "mem-sync-1",
+                    "base_version": 1,
+                    "action": "update",
+                    "payload": {
+                        "value": "06:30",
+                    },
+                }
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert update_res.status_code == 200
+    assert update_res.json()["results"][0]["status"] == "applied"
+    assert update_res.json()["results"][0]["new_version"] == 2
+
+    # 4. Pull includes both changes
+    pull = await client.get("/v1/sync/pull?since_seq=0", headers=auth_headers)
+    assert pull.status_code == 200
+    mem_changes = [c for c in pull.json()["changes"] if c["entity_type"] == "memory"]
+    assert len(mem_changes) == 2
+    assert mem_changes[0]["change_type"] == "create"
+    assert mem_changes[1]["change_type"] == "update"
+
