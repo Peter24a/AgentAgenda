@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../agenda/models/agent_proposal.dart';
@@ -303,17 +304,147 @@ class _ChatScreenState extends State<ChatScreen> {
                             bottomRight: Radius.circular(msg.isUser ? 4 : 20),
                           ),
                         ),
-                        child: Text(
-                          msg.text.isEmpty && _isGenerating
-                              ? 'Pensando...'
-                              : msg.text,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: msg.isUser
-                                ? theme.colorScheme.onPrimary
-                                : theme.colorScheme.onSurface,
-                            height: 1.35,
-                          ),
-                        ),
+                        child: msg.isUser
+                            ? Text(
+                                msg.text,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onPrimary,
+                                  height: 1.35,
+                                ),
+                              )
+                            : (msg.text.isEmpty && _isGenerating
+                                  ? Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: theme.colorScheme.primary,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Pensando...',
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                                color: theme
+                                                    .colorScheme
+                                                    .onSurface
+                                                    .withValues(alpha: 0.7),
+                                                fontStyle: FontStyle.italic,
+                                              ),
+                                        ),
+                                      ],
+                                    )
+                                  : MarkdownBody(
+                                      data: msg.text,
+                                      selectable: true,
+                                      softLineBreak: true,
+                                      styleSheet:
+                                          MarkdownStyleSheet.fromTheme(
+                                            theme,
+                                          ).copyWith(
+                                            p: theme.textTheme.bodyMedium
+                                                ?.copyWith(
+                                                  color: theme
+                                                      .colorScheme
+                                                      .onSurface,
+                                                  height: 1.4,
+                                                ),
+                                            h1: theme.textTheme.titleLarge
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: theme
+                                                      .colorScheme
+                                                      .onSurface,
+                                                ),
+                                            h2: theme.textTheme.titleMedium
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: theme
+                                                      .colorScheme
+                                                      .onSurface,
+                                                ),
+                                            h3: theme.textTheme.titleSmall
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: theme
+                                                      .colorScheme
+                                                      .onSurface,
+                                                ),
+                                            strong: theme.textTheme.bodyMedium
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: theme
+                                                      .colorScheme
+                                                      .onSurface,
+                                                ),
+                                            em: theme.textTheme.bodyMedium
+                                                ?.copyWith(
+                                                  fontStyle: FontStyle.italic,
+                                                  color: theme
+                                                      .colorScheme
+                                                      .onSurface,
+                                                ),
+                                            code: TextStyle(
+                                              backgroundColor: isDark
+                                                  ? theme
+                                                        .colorScheme
+                                                        .surfaceContainerHighest
+                                                  : theme
+                                                        .colorScheme
+                                                        .surfaceContainerHighest
+                                                        .withValues(alpha: 0.5),
+                                              fontFamily: 'monospace',
+                                              fontSize: 13,
+                                              color: theme.colorScheme.primary,
+                                            ),
+                                            codeblockDecoration: BoxDecoration(
+                                              color: isDark
+                                                  ? theme
+                                                        .colorScheme
+                                                        .surfaceContainerHighest
+                                                  : theme
+                                                        .colorScheme
+                                                        .surfaceContainerHighest
+                                                        .withValues(alpha: 0.5),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            blockquoteDecoration: BoxDecoration(
+                                              border: Border(
+                                                left: BorderSide(
+                                                  color:
+                                                      theme.colorScheme.primary,
+                                                  width: 3,
+                                                ),
+                                              ),
+                                              color: theme
+                                                  .colorScheme
+                                                  .surfaceContainerHighest
+                                                  .withValues(alpha: 0.3),
+                                              borderRadius:
+                                                  const BorderRadius.only(
+                                                    topRight: Radius.circular(
+                                                      4,
+                                                    ),
+                                                    bottomRight:
+                                                        Radius.circular(4),
+                                                  ),
+                                            ),
+                                            listBullet: theme
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.copyWith(
+                                                  color:
+                                                      theme.colorScheme.primary,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                            blockSpacing: 8,
+                                          ),
+                                    )),
                       ),
                     if (msg.proposal != null)
                       Padding(

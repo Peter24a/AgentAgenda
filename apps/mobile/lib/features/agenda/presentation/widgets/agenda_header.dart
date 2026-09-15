@@ -169,7 +169,6 @@ class AgendaHeader extends StatelessWidget {
               minHeight: 4,
               backgroundColor: theme.colorScheme.surfaceContainerHighest,
               semanticsLabel: 'Progreso de actividades',
-              semanticsValue: '$completedActivities de $totalActivities',
             ),
           ),
         ],
