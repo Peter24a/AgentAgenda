@@ -3,7 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db_session, require_scope
+from app.api.deps import get_db_session, require_scope, has_scope
 from app.models.auth import AuthContext
 from app.models.memory import (
     ContextAssembleRequest,
@@ -19,6 +19,11 @@ from app.services.context_engine import context_engine
 from app.services.memory_service import memory_service
 
 router = APIRouter(tags=["Structured Memory & Context Engine"])
+
+
+def validate_context_scopes(auth, include_agenda):
+    if include_agenda and not all(has_scope(auth, scope) for scope in ("agenda:read", "tasks:read")):
+        raise HTTPException(status_code=403, detail="Se requieren agenda:read y tasks:read para incluir agenda")
 
 
 @router.post(
@@ -137,6 +142,7 @@ async def get_context(
     session: AsyncSession = Depends(get_db_session),
     auth: AuthContext = Depends(require_scope("memory:read")),
 ):
+    validate_context_scopes(auth, include_agenda)
     req = ContextAssembleRequest(
         purpose=purpose,
         as_of=as_of,
@@ -161,6 +167,7 @@ async def assemble_context_post(
     session: AsyncSession = Depends(get_db_session),
     auth: AuthContext = Depends(require_scope("memory:read")),
 ):
+    validate_context_scopes(auth, req.include_agenda)
     return await context_engine.assemble_context(
         session=session,
         user_id=auth.user_id,

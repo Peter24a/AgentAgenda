@@ -27,7 +27,7 @@ from app.services.proposal_parser import extract_proposal_from_text
 
 async def add_document(session, key, text, *, user="default_user", deleted=False,
                        status="ready", version=1, title="Archivo de prueba",
-                       privacy=None, source_kind="reference"):
+                       privacy="SAFE", source_kind="reference"):
     document = Document(id=key, user_id=user, title=title, is_deleted=deleted)
     session.add(document)
     await session.flush()
@@ -72,6 +72,8 @@ async def test_search_excludes_other_owner_deleted_private_and_superseded(db_ses
         ("other", {"user": "another-user"}),
         ("deleted", {"deleted": True}),
         ("private", {"privacy": "NEVER_UPLOAD"}),
+        ("opt-in", {"privacy": "OPT_IN"}),
+        ("unclassified", {"privacy": None}),
         ("outdated", {}),
     ]:
         await add_document(db_session, key, "Dirección: calle anterior.", **values)

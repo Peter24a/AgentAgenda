@@ -1,5 +1,7 @@
 # Archivo personal: importación y consulta
 
+Actualización: 15 de septiembre de 2026. Política implementada de contexto: fuentes documentales explícitamente SAFE; acceso adicional por destinatario pendiente de grants persistentes.
+
 El backend conserva originales y recupera fragmentos relevantes para el chat.
 La información pertenece al usuario de la importación; no modifica los pesos del
 modelo ni convierte documentos antiguos en acciones nuevas.
@@ -78,8 +80,12 @@ prueba de que todos los documentos estén listos: revisar los estados de extracc
 página/sección y origen. Requiere `documents:read`. El chat utiliza las mismas
 fuentes sólo cuando sus credenciales incluyen ese alcance. Requiere la última
 revisión no borrada, sin volver silenciosamente a una versión vieja pendiente.
-El material OPT_IN incluido con autorización queda disponible para esas consultas
-del propietario; no se solicita consentimiento de nuevo en cada pregunta.
+Los documentos importados OPT_IN siguen en el catálogo privado del propietario,
+pero su presencia en la base no concede acceso al modelo o a clientes MCP.
+La recuperación para modelos y exportaciones usa únicamente orígenes marcados
+SAFE; originales sin clasificación también quedan excluidos de ese contexto.
+La autorización OPT_IN por propósito/destinatario requiere un grant persistente,
+aún no implementado. Esta restricción no borra los originales ni sus revisiones.
 
 El modelo recibe un subconjunto del archivo según la pregunta y un presupuesto
 de contexto. Se le exige citar fuentes, reconocer falta de evidencia y distinguir

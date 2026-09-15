@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.canonical import Memory, MemorySource
@@ -12,6 +12,7 @@ from app.models.memory import (
     MemoryForgetRequest,
     MemorySearchRequest,
 )
+from app.services.context_visibility import memory_source_visibility
 
 
 class MemoryService:
@@ -62,8 +63,12 @@ class MemoryService:
         session: AsyncSession,
         user_id: str,
         req: MemorySearchRequest,
+        *,
+        for_model: bool = False,
     ) -> Tuple[List[Memory], int]:
         filters = [Memory.user_id == user_id]
+        if for_model:
+            filters.extend([Memory.status == "active", memory_source_visibility(user_id)])
 
         if req.status and req.status.lower() != "all":
             filters.append(Memory.status == req.status.lower())
@@ -84,18 +89,24 @@ class MemoryService:
                 )
             )
 
-        if req.as_of:
+        as_of = req.as_of or (datetime.now(timezone.utc) if for_model else None)
+        if as_of:
+            if as_of.tzinfo:
+                as_of = as_of.astimezone(timezone.utc).replace(tzinfo=None)
             # Filtrar por vigencia temporal
             filters.append(
                 or_(
                     Memory.valid_from.is_(None),
-                    Memory.valid_from <= req.as_of,
+                    Memory.valid_from <= as_of,
                 )
             )
             filters.append(
                 or_(
                     Memory.valid_to.is_(None),
-                    Memory.valid_to >= req.as_of,
+                    Memory.valid_to >= as_of,
+                    # Check-ins describe an instant in the past; their point
+                    # interval is not an expiry of the historical observation.
+                    (Memory.memory_type == "episodic") & (Memory.predicate == "activity_check_in") if for_model else False,
                 )
             )
 
@@ -145,9 +156,13 @@ class MemoryService:
 
         now = datetime.now(timezone.utc).replace(tzinfo=None)
 
-        # 1. Marcar memoria anterior como superseded
-        old_mem.status = "superseded"
-        old_mem.updated_at = now
+        # Claim this active revision atomically; two concurrent corrections must
+        # not publish two active descendants of the same fact.
+        changed = await session.execute(update(Memory).where(
+            Memory.id == old_mem.id, Memory.user_id == user_id, Memory.status == "active",
+        ).values(status="superseded", updated_at=now))
+        if changed.rowcount != 1:
+            raise ValueError("La memoria cambió; consulte su versión vigente")
 
         # 2. Crear nueva versión
         new_id = f"mem-{uuid.uuid4().hex[:12]}"
@@ -170,13 +185,17 @@ class MemoryService:
         )
         session.add(new_mem)
 
-        # 3. Registrar origen
+        # Keep prior provenance so a correction cannot discard the source's
+        # privacy/revocation boundary by changing source_kind to 'chat'.
+        sources = {(source.source_kind, source.source_id) for source in old_mem.sources}
         if req.source_id:
+            sources.add((req.source_kind, req.source_id))
+        for source_kind, source_id in sources:
             src = MemorySource(
                 id=f"src-{uuid.uuid4().hex[:12]}",
                 memory_id=new_id,
-                source_kind=req.source_kind,
-                source_id=req.source_id,
+                source_kind=source_kind,
+                source_id=source_id,
                 created_at=now,
             )
             session.add(src)
@@ -194,6 +213,8 @@ class MemoryService:
         mem = await self.get_memory_by_id(session, user_id, req.memory_id)
         if not mem:
             raise ValueError(f"Memoria '{req.memory_id}' no encontrada")
+        if mem.status == "superseded":
+            raise ValueError("La memoria tiene una corrección; revoque su versión vigente")
 
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         mem.status = "revoked"

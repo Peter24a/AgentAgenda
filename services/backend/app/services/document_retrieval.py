@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, noload
 
 from app.models.canonical import Document, DocumentOrigin, DocumentRevision
+from app.services.context_visibility import safe_document_filters
 
 
 # The deployed model has an 8192-token window. Reserve 1024 tokens for output and
@@ -225,15 +226,10 @@ class DocumentRetrievalService:
             .join(DocumentRevision, DocumentRevision.document_id == Document.id)
             .outerjoin(DocumentOrigin, DocumentOrigin.document_id == Document.id)
             .where(
-                Document.user_id == user_id,
-                Document.is_deleted.is_(False),
+                *safe_document_filters(user_id),
                 DocumentRevision.id == latest_id,
                 DocumentRevision.extraction_status.in_(("ready", "needs_review")),
                 DocumentRevision.extracted_text.is_not(None),
-                or_(
-                    DocumentOrigin.document_id.is_(None),
-                    DocumentOrigin.privacy_class.in_(("SAFE", "OPT_IN")),
-                ),
             )
             .options(noload(Document.revisions), noload(DocumentRevision.document))
         )

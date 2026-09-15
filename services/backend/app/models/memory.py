@@ -1,6 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 class MemoryCreateRequest(BaseModel):
@@ -13,6 +14,12 @@ class MemoryCreateRequest(BaseModel):
     source_id: Optional[str] = Field(None, description="ID del origen (ej. turn_id, doc_id)")
     valid_from: Optional[datetime] = None
     valid_to: Optional[datetime] = None
+
+    @field_validator("valid_from", "valid_to")
+    @classmethod
+    def normalize_instant(cls, value):
+        # The canonical DateTime columns store UTC without an offset.
+        return value.astimezone(timezone.utc).replace(tzinfo=None) if value and value.tzinfo else value
 
 
 class MemorySourceDetail(BaseModel):
@@ -79,6 +86,17 @@ class ContextAssembleRequest(BaseModel):
     token_budget: int = Field(2048, ge=256, le=8192, description="Presupuesto máximo estimado de tokens")
     include_agenda: bool = Field(True, description="Incluir actividades y tareas del día")
     include_memories: bool = Field(True, description="Incluir hechos y preferencias relevantes")
+    timezone: Optional[str] = None
+
+    @field_validator("timezone")
+    @classmethod
+    def valid_timezone(cls, value):
+        if value:
+            try:
+                ZoneInfo(value)
+            except (ZoneInfoNotFoundError, ValueError):
+                raise ValueError("Zona horaria IANA inválida")
+        return value
 
 
 class ContextAssembleResponse(BaseModel):
