@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/theme/beam_color_notifier.dart';
 import '../../../../core/theme/color_schemes.dart';
 
 /// Modal de ajustes y configuración del servidor backend para SARA Agenda.
@@ -146,6 +147,86 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
                 ),
               ],
             ),
+          ),
+
+          const SizedBox(height: 20),
+          const Divider(height: 1),
+          const SizedBox(height: 18),
+
+          Row(
+            children: [
+              Icon(Icons.all_inclusive_rounded, size: 20, color: colorScheme.primary),
+              const SizedBox(width: 10),
+              Text(
+                'Lazo Perimetral (Analogía al Isotipo)',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Lazo de luz que recorre el borde del dispositivo, simbolizando el flujo continuo y la identidad de SARA.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          ValueListenableBuilder<bool>(
+            valueListenable: BeamColorConfig.isEnabled,
+            builder: (context, enabled, _) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SwitchListTile.adaptive(
+                    value: enabled,
+                    onChanged: (val) => BeamColorConfig.isEnabled.value = val,
+                    title: const Text('Activar lazo perimetral'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  if (enabled) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Estilo de lazo:',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ValueListenableBuilder<BeamThemeOption>(
+                      valueListenable: BeamColorConfig.currentOption,
+                      builder: (context, current, _) {
+                        return Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: BeamColorConfig.options.map((opt) {
+                            final isSelected = opt.name == current.name;
+                            return ChoiceChip(
+                              label: Text(opt.name),
+                              selected: isSelected,
+                              onSelected: (_) => BeamColorConfig.currentOption.value = opt,
+                              avatar: Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: opt.primaryColor,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
+                  ],
+                ],
+              );
+            },
           ),
 
           const SizedBox(height: 22),
