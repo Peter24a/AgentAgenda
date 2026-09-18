@@ -1,68 +1,119 @@
 import 'package:flutter/material.dart';
 
-/// Paletas tonales predeterminadas con la estética Material You / Pixel.
+/// Tokens de diseño y paletas cromáticas oficiales de SARA (v0.4.0).
+/// Ciruela desaturado (#6B4F73 / #C5AED0), superficies neutras de alta legibilidad
+/// y cero degradados en componentes estándar.
+class SaraColors {
+  SaraColors._();
+
+  // Modo Claro
+  static const Color lightBackground = Color(0xFFF7F5F2);
+  static const Color lightSurface = Color(0xFFFFFFFF);
+  static const Color lightSurfaceSubtle = Color(0xFFEEEAEF);
+  static const Color lightText = Color(0xFF251F29);
+  static const Color lightTextSecondary = Color(0xFF6C636F);
+  static const Color lightBorder = Color(0xFFDED8E2);
+  static const Color lightBorderControl = Color(0xFF8C8292);
+  static const Color lightAction = Color(0xFF6B4F73);
+  static const Color lightActionHover = Color(0xFF5B4263);
+  static const Color lightActionActive = Color(0xFF4C3654);
+  static const Color lightOnAction = Color(0xFFFFFFFF);
+  static const Color lightActionSoft = Color(0xFFEEE8F1);
+  static const Color lightSuccess = Color(0xFF24724A);
+  static const Color lightSuccessSoft = Color(0xFFDFF3E7);
+  static const Color lightWarning = Color(0xFF8A5800);
+  static const Color lightWarningSoft = Color(0xFFFFF3DB);
+  static const Color lightError = Color(0xFFBA1A1A);
+  static const Color lightErrorSoft = Color(0xFFFDECEC);
+  static const Color lightInfo = Color(0xFF5B4F60);
+  static const Color lightInfoSoft = Color(0xFFEEEAEF);
+
+  // Modo Oscuro
+  static const Color darkBackground = Color(0xFF151217);
+  static const Color darkSurface = Color(0xFF1E1A22);
+  static const Color darkSurfaceSubtle = Color(0xFF28232C);
+  static const Color darkText = Color(0xFFF3EEF5);
+  static const Color darkTextSecondary = Color(0xFFBEB4C4);
+  static const Color darkBorder = Color(0xFF3D3544);
+  static const Color darkBorderControl = Color(0xFF807488);
+  static const Color darkAction = Color(0xFFC5AED0);
+  static const Color darkActionHover = Color(0xFFD3BFDC);
+  static const Color darkActionActive = Color(0xFFB69CC3);
+  static const Color darkOnAction = Color(0xFF231B28);
+  static const Color darkActionSoft = Color(0xFF302635);
+  static const Color darkSuccess = Color(0xFF81C995);
+  static const Color darkSuccessSoft = Color(0xFF173B2C);
+  static const Color darkWarning = Color(0xFFFFD28A);
+  static const Color darkWarningSoft = Color(0xFF3D2F14);
+  static const Color darkError = Color(0xFFFFA6A0);
+  static const Color darkErrorSoft = Color(0xFF49292D);
+  static const Color darkInfo = Color(0xFFBEB4C4);
+  static const Color darkInfoSoft = Color(0xFF28232C);
+}
+
 class AppColorSchemes {
   AppColorSchemes._();
 
-  // Tono primario estilo Pixel Mint / Teal orgánico
-  static const Color primaryLight = Color(0xFF006A60);
-  static const Color primaryDark = Color(0xFF53DBC9);
+  static const Color primaryLight = SaraColors.lightAction;
+  static const Color primaryDark = SaraColors.darkAction;
 
   static const ColorScheme lightColorScheme = ColorScheme(
     brightness: Brightness.light,
-    primary: primaryLight,
-    onPrimary: Color(0xFFFFFFFF),
-    primaryContainer: Color(0xFF73F8E5),
-    onPrimaryContainer: Color(0xFF00201C),
-    secondary: Color(0xFF4A635F),
-    onSecondary: Color(0xFFFFFFFF),
-    secondaryContainer: Color(0xFFCCE8E2),
-    onSecondaryContainer: Color(0xFF05201C),
-    tertiary: Color(0xFF456179),
-    onTertiary: Color(0xFFFFFFFF),
-    tertiaryContainer: Color(0xFFCCE5FF),
-    onTertiaryContainer: Color(0xFF001E31),
-    error: Color(0xFFBA1A1A),
-    onError: Color(0xFFFFFFFF),
-    errorContainer: Color(0xFFFFDAD6),
-    onErrorContainer: Color(0xFF410002),
-    surface: Color(0xFFFAFDFB),
-    onSurface: Color(0xFF191C1B),
-    surfaceContainerLowest: Color(0xFFFFFFFF),
-    surfaceContainerLow: Color(0xFFF4F7F5),
-    surfaceContainer: Color(0xFFEEF1EF),
-    surfaceContainerHigh: Color(0xFFE8EBE9),
-    surfaceContainerHighest: Color(0xFFE2E5E3),
-    outline: Color(0xFF6F7977),
-    outlineVariant: Color(0xFFBEC9C6),
+    primary: SaraColors.lightAction,
+    onPrimary: SaraColors.lightOnAction,
+    primaryContainer: SaraColors.lightActionSoft,
+    onPrimaryContainer: SaraColors.lightText,
+    secondary: SaraColors.lightTextSecondary,
+    onSecondary: SaraColors.lightSurface,
+    secondaryContainer: SaraColors.lightSurfaceSubtle,
+    onSecondaryContainer: SaraColors.lightText,
+    tertiary: SaraColors.lightInfo,
+    onTertiary: SaraColors.lightSurface,
+    tertiaryContainer: SaraColors.lightInfoSoft,
+    onTertiaryContainer: SaraColors.lightText,
+    error: SaraColors.lightError,
+    onError: SaraColors.lightSurface,
+    errorContainer: SaraColors.lightErrorSoft,
+    onErrorContainer: SaraColors.lightError,
+    surface: SaraColors.lightBackground,
+    onSurface: SaraColors.lightText,
+    onSurfaceVariant: SaraColors.lightTextSecondary,
+    surfaceContainerLowest: SaraColors.lightSurface,
+    surfaceContainerLow: SaraColors.lightSurface,
+    surfaceContainer: SaraColors.lightSurfaceSubtle,
+    surfaceContainerHigh: SaraColors.lightActionSoft,
+    surfaceContainerHighest: Color(0xFFE8E4EA),
+    outline: SaraColors.lightBorderControl,
+    outlineVariant: SaraColors.lightBorder,
   );
 
   static const ColorScheme darkColorScheme = ColorScheme(
     brightness: Brightness.dark,
-    primary: primaryDark,
-    onPrimary: Color(0xFF003731),
-    primaryContainer: Color(0xFF005048),
-    onPrimaryContainer: Color(0xFF73F8E5),
-    secondary: Color(0xFFB0CCC6),
-    onSecondary: Color(0xFF1C3531),
-    secondaryContainer: Color(0xFF334B47),
-    onSecondaryContainer: Color(0xFFCCE8E2),
-    tertiary: Color(0xFFACCAE5),
-    onTertiary: Color(0xFF143349),
-    tertiaryContainer: Color(0xFF2D4A60),
-    onTertiaryContainer: Color(0xFFCCE5FF),
-    error: Color(0xFFFFB4AB),
-    onError: Color(0xFF690005),
-    errorContainer: Color(0xFF93000A),
-    onErrorContainer: Color(0xFFFFDAD6),
-    surface: Color(0xFF101413),
-    onSurface: Color(0xFFE0E3E1),
-    surfaceContainerLowest: Color(0xFF0B0F0E),
-    surfaceContainerLow: Color(0xFF191C1B),
-    surfaceContainer: Color(0xFF1D201F),
-    surfaceContainerHigh: Color(0xFF272B2A),
-    surfaceContainerHighest: Color(0xFF323635),
-    outline: Color(0xFF899390),
-    outlineVariant: Color(0xFF3F4947),
+    primary: SaraColors.darkAction,
+    onPrimary: SaraColors.darkOnAction,
+    primaryContainer: SaraColors.darkActionSoft,
+    onPrimaryContainer: SaraColors.darkText,
+    secondary: SaraColors.darkTextSecondary,
+    onSecondary: SaraColors.darkOnAction,
+    secondaryContainer: SaraColors.darkSurfaceSubtle,
+    onSecondaryContainer: SaraColors.darkText,
+    tertiary: SaraColors.darkInfo,
+    onTertiary: SaraColors.darkOnAction,
+    tertiaryContainer: SaraColors.darkInfoSoft,
+    onTertiaryContainer: SaraColors.darkText,
+    error: SaraColors.darkError,
+    onError: SaraColors.darkErrorSoft,
+    errorContainer: SaraColors.darkErrorSoft,
+    onErrorContainer: SaraColors.darkError,
+    surface: SaraColors.darkBackground,
+    onSurface: SaraColors.darkText,
+    onSurfaceVariant: SaraColors.darkTextSecondary,
+    surfaceContainerLowest: SaraColors.darkBackground,
+    surfaceContainerLow: SaraColors.darkSurface,
+    surfaceContainer: SaraColors.darkSurface,
+    surfaceContainerHigh: SaraColors.darkSurfaceSubtle,
+    surfaceContainerHighest: SaraColors.darkBorder,
+    outline: SaraColors.darkBorderControl,
+    outlineVariant: SaraColors.darkBorder,
   );
 }

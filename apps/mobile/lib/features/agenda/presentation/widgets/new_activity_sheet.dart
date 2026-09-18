@@ -102,10 +102,18 @@ class _NewActivitySheetState extends State<NewActivitySheet> {
             decoration: InputDecoration(
               hintText: '¿Qué tienes planeado?',
               filled: true,
-              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              fillColor: theme.colorScheme.surfaceContainerLow,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: theme.colorScheme.outline),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
               ),
             ),
           ),
@@ -113,7 +121,7 @@ class _NewActivitySheetState extends State<NewActivitySheet> {
 
           // Selector de categorías
           Text(
-            'Categoría & Atmósfera',
+            'Categoría',
             style: theme.textTheme.labelMedium?.copyWith(
               fontWeight: FontWeight.w700,
             ),
@@ -130,7 +138,16 @@ class _NewActivitySheetState extends State<NewActivitySheet> {
                     label: Text('${cat.primaryEmoji} ${cat.label}'),
                     selected: isSelected,
                     onSelected: (_) => setState(() => _selectedCategory = cat),
-                    selectedColor: cat.tintColor.withValues(alpha: 0.25),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(
+                        color: isSelected
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.outlineVariant,
+                        width: 1.0,
+                      ),
+                    ),
+                    selectedColor: theme.colorScheme.primaryContainer,
                   ),
                 );
               }).toList(),
@@ -154,8 +171,9 @@ class _NewActivitySheetState extends State<NewActivitySheet> {
                   label: Text('Inicio: ${_startTime.format(context)}'),
                   style: OutlinedButton.styleFrom(
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(8),
                     ),
+                    minimumSize: const Size(44, 44),
                   ),
                 ),
               ),
@@ -177,8 +195,9 @@ class _NewActivitySheetState extends State<NewActivitySheet> {
                   ),
                   style: OutlinedButton.styleFrom(
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(8),
                     ),
+                    minimumSize: const Size(44, 44),
                   ),
                 ),
               ),
@@ -194,7 +213,7 @@ class _NewActivitySheetState extends State<NewActivitySheet> {
               onPressed: _save,
               style: FilledButton.styleFrom(
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
               child: const Text(

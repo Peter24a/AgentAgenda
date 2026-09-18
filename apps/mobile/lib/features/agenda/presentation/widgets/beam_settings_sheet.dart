@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../../core/network/api_client.dart';
-import '../../../../core/theme/beam_color_notifier.dart';
+import '../../../../core/theme/color_schemes.dart';
 
-/// Modal para personalizar el color del lazo luminoso ("gusanito")
-/// y configurar la dirección del servidor backend con LLM.
+/// Modal de ajustes y configuración del servidor backend para SARA Agenda.
+/// Cumple con la Identidad Visual SARA v0.4.0 (radio modal 16px, controles 8px, cero degradados).
 class BeamSettingsSheet extends StatefulWidget {
   const BeamSettingsSheet({super.key});
 
@@ -15,6 +15,7 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
   late final TextEditingController _serverController;
   bool _testingConnection = false;
   String? _connectionStatus;
+  bool? _connectionSuccess;
 
   @override
   void initState() {
@@ -35,6 +36,7 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
     setState(() {
       _testingConnection = true;
       _connectionStatus = null;
+      _connectionSuccess = null;
     });
 
     await ApiClient.instance.setBaseUrl(url);
@@ -44,9 +46,10 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
     if (mounted) {
       setState(() {
         _testingConnection = false;
+        _connectionSuccess = isHealthy;
         _connectionStatus = isHealthy
-            ? '✓ Conectado exitosamente (${events.length} actividades)'
-            : '✗ No se pudo alcanzar el backend en esa dirección';
+            ? '✓ Conexión establecida (${events.length} actividades disponibles)'
+            : '✗ No se pudo alcanzar el servidor en esta dirección';
       });
     }
   }
@@ -54,6 +57,8 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
@@ -66,7 +71,7 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: theme.colorScheme.outlineVariant,
+                color: colorScheme.outlineVariant,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -75,130 +80,95 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
 
           Row(
             children: [
-              const Icon(Icons.palette_outlined, size: 22),
+              Icon(Icons.tune_rounded, size: 22, color: colorScheme.primary),
               const SizedBox(width: 10),
               Text(
-                'Color del destello luminoso',
+                'Ajustes de SARA Agenda',
                 style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
+                  color: colorScheme.onSurface,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 6),
           Text(
-            'Elige entre el espectro multicolor dinámico o un tono sólido.',
+            'Identidad Visual Unificada SARA v0.4.0 · Comunidad FIME',
             style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 16),
 
-          ValueListenableBuilder<BeamThemeOption>(
-            valueListenable: BeamColorConfig.currentOption,
-            builder: (context, activeOption, _) {
-              return Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: BeamColorConfig.options.map((option) {
-                  final isSelected = activeOption.name == option.name;
-
-                  return InkWell(
-                    onTap: () {
-                      BeamColorConfig.currentOption.value = option;
-                    },
-                    borderRadius: BorderRadius.circular(24),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 9,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? option.primaryColor.withValues(alpha: 0.18)
-                            : theme.colorScheme.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: isSelected
-                              ? option.primaryColor
-                              : Colors.transparent,
-                          width: 1.8,
+          // Tarjeta de información de la identidad
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: colorScheme.secondaryContainer,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: colorScheme.outlineVariant,
+                width: 1.0,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Firma de Marca: Ciruela SARA',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurface,
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 20,
-                            height: 20,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: option.isMulticolor
-                                  ? const SweepGradient(
-                                      colors: [
-                                        Color(0xFF4285F4),
-                                        Color(0xFF9C27B0),
-                                        Color(0xFFEA4335),
-                                        Color(0xFFFBBC05),
-                                        Color(0xFF34A853),
-                                        Color(0xFF26C6DA),
-                                        Color(0xFF4285F4),
-                                      ],
-                                    )
-                                  : null,
-                              color: option.isMulticolor
-                                  ? null
-                                  : option.primaryColor,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: option.primaryColor.withValues(alpha: 0.35),
-                                  blurRadius: 6,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            option.name,
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              fontWeight: isSelected
-                                  ? FontWeight.w800
-                                  : FontWeight.w500,
-                              color: isSelected
-                                  ? theme.colorScheme.onSurface
-                                  : theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
+                      const SizedBox(height: 2),
+                      Text(
+                        isDark ? '#C5AED0 en modo oscuro' : '#6B4F73 en modo claro',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
                       ),
-                    ),
-                  );
-                }).toList(),
-              );
-            },
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 22),
           const Divider(height: 1),
           const SizedBox(height: 18),
 
           Row(
             children: [
-              const Icon(Icons.dns_rounded, size: 22),
+              const Icon(Icons.dns_rounded, size: 20),
               const SizedBox(width: 10),
               Text(
-                'Servidor Backend & LLM',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
+                'Servidor Backend & API',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 6),
           Text(
-            'URL del servicio FastAPI conectado al Qwen 27B local.',
+            'Dirección de la API en vivo o del entorno de desarrollo.',
             style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 12),
@@ -209,16 +179,24 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
                 child: TextField(
                   controller: _serverController,
                   decoration: InputDecoration(
-                    hintText: 'https://agenda.ici-labs.com o IP:8001',
+                    hintText: 'https://agenda-api.pedroibarra.dev',
                     contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
+                      horizontal: 14,
                       vertical: 12,
                     ),
                     filled: true,
-                    fillColor: theme.colorScheme.surfaceContainerHigh,
+                    fillColor: colorScheme.surfaceContainerLow,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: colorScheme.outline),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: colorScheme.outlineVariant),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: colorScheme.primary, width: 2),
                     ),
                   ),
                   style: theme.textTheme.bodyMedium,
@@ -229,27 +207,81 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
                 onPressed: _testingConnection ? null : _testAndSaveServer,
                 style: FilledButton.styleFrom(
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  minimumSize: const Size(80, 48),
                 ),
                 child: _testingConnection
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: colorScheme.onPrimary,
+                        ),
                       )
                     : const Text('Guardar'),
               ),
             ],
           ),
+          const SizedBox(height: 8),
+
+          // Acceso rápido para restaurar servidor oficial en cite-server
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              ActionChip(
+                label: const Text('Servidor Oficial (cite-server)'),
+                onPressed: () {
+                  _serverController.text = 'https://agenda-api.pedroibarra.dev';
+                  _testAndSaveServer();
+                },
+              ),
+              ActionChip(
+                label: const Text('Local (127.0.0.1:8001)'),
+                onPressed: () {
+                  _serverController.text = 'http://127.0.0.1:8001';
+                  _testAndSaveServer();
+                },
+              ),
+            ],
+          ),
+
           if (_connectionStatus != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              _connectionStatus!,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w600,
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: _connectionSuccess == true
+                    ? (isDark ? SaraColors.darkSuccessSoft : SaraColors.lightSuccessSoft)
+                    : (isDark ? SaraColors.darkErrorSoft : SaraColors.lightErrorSoft),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _connectionSuccess == true
+                        ? Icons.check_circle_rounded
+                        : Icons.error_outline_rounded,
+                    size: 16,
+                    color: _connectionSuccess == true
+                        ? (isDark ? SaraColors.darkSuccess : SaraColors.lightSuccess)
+                        : (isDark ? SaraColors.darkError : SaraColors.lightError),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _connectionStatus!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: _connectionSuccess == true
+                            ? (isDark ? SaraColors.darkSuccess : SaraColors.lightSuccess)
+                            : (isDark ? SaraColors.darkError : SaraColors.lightError),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

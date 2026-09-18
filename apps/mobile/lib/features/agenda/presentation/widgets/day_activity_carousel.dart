@@ -252,7 +252,7 @@ class _ActivityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tint = item.category.tintColor;
+    final colorScheme = theme.colorScheme;
     final active =
         !item.isCompleted &&
         !item.startTime.isAfter(now) &&
@@ -260,135 +260,150 @@ class _ActivityCard extends StatelessWidget {
     final label = item.isCompleted
         ? 'Completada'
         : active
-        ? 'Ahora · en curso'
+        ? 'Ahora · En curso'
         : agendaEventEnd(item).isBefore(now)
         ? 'Anterior'
         : 'Próxima';
     final provisional =
         item.description?.toLowerCase().contains('horario provisional') ??
         false;
+
     return Material(
-      color: Color.alphaBlend(
-        tint.withValues(alpha: 0.14),
-        theme.colorScheme.surfaceContainerLow,
-      ),
+      color: colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: active
-              ? tint.withValues(alpha: 0.8)
-              : tint.withValues(alpha: 0.22),
-          width: active ? 1.8 : 1,
+          color: colorScheme.outlineVariant,
+          width: 1.0,
         ),
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
+          // Indicador visual lateral de estado activo (SARA ciruela, WCAG 1.4.1)
           Positioned(
-            right: -10,
-            top: 20,
-            child: ExcludeSemantics(
-              child: Opacity(
-                opacity: 0.13,
-                child: Text(
-                  item.category.primaryEmoji,
-                  style: const TextStyle(fontSize: 100),
-                ),
-              ),
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 4,
+            child: ColoredBox(
+              color: item.isCompleted
+                  ? colorScheme.outlineVariant
+                  : (active ? colorScheme.primary : colorScheme.primary.withValues(alpha: 0.5)),
             ),
           ),
-          Positioned.fill(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  label,
-                                  style: theme.textTheme.labelLarge?.copyWith(
-                                    color: active
-                                        ? tint
-                                        : theme.colorScheme.onSurfaceVariant,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                label,
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: active
+                                      ? colorScheme.primary
+                                      : colorScheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.2,
                                 ),
                               ),
-                              IconButton(
-                                onPressed: onTap,
-                                icon: const Icon(Icons.more_horiz_rounded),
-                                tooltip: 'Detalles y opciones de actividad',
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 6,
-                            children: [
-                              _Pill(
-                                text: item.timeRange,
-                                icon: Icons.schedule_rounded,
-                              ),
-                              if (provisional)
-                                const _Pill(
-                                  text: 'Horario provisional',
-                                  icon: Icons.edit_calendar_outlined,
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 18),
-                          Text(
-                            item.title,
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.6,
-                              decoration: item.isCompleted
-                                  ? TextDecoration.lineThrough
-                                  : null,
                             ),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            item.description?.isNotEmpty == true
-                                ? item.description!
-                                : item.category.label,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                              height: 1.4,
+                            IconButton(
+                              onPressed: onTap,
+                              icon: const Icon(Icons.more_horiz_rounded),
+                              tooltip: 'Detalles y opciones de actividad',
+                              style: IconButton.styleFrom(
+                                minimumSize: const Size(44, 44),
+                              ),
                             ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            _Pill(
+                              text: item.timeRange,
+                              icon: Icons.schedule_rounded,
+                            ),
+                            _Pill(
+                              text: item.category.label,
+                              icon: Icons.label_outline_rounded,
+                            ),
+                            if (provisional)
+                              const _Pill(
+                                text: 'Horario provisional',
+                                icon: Icons.edit_calendar_outlined,
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          item.title,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.3,
+                            decoration: item.isCompleted
+                                ? TextDecoration.lineThrough
+                                : null,
+                            color: item.isCompleted
+                                ? colorScheme.onSurface.withValues(alpha: 0.45)
+                                : colorScheme.onSurface,
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          item.description?.isNotEmpty == true
+                              ? item.description!
+                              : 'Actividad programada en SARA Agenda.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant.withValues(
+                              alpha: item.isCompleted ? 0.45 : 0.85,
+                            ),
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: onToggle,
-                      icon: Icon(
-                        item.isCompleted
-                            ? Icons.check_circle_rounded
-                            : Icons.radio_button_unchecked_rounded,
-                        size: 21,
-                      ),
-                      label: Text(
-                        item.isCompleted ? 'Completada' : 'Marcar como hecha',
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: onToggle,
+                    style: TextButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
+                    icon: Icon(
+                      item.isCompleted
+                          ? Icons.check_circle_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                      size: 20,
+                      color: item.isCompleted
+                          ? colorScheme.primary
+                          : colorScheme.outline,
+                    ),
+                    label: Text(
+                      item.isCompleted ? 'Completada' : 'Marcar como realizada',
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
@@ -404,22 +419,28 @@ class _Pill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.65),
-        borderRadius: BorderRadius.circular(12),
+        color: colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: colorScheme.outlineVariant,
+          width: 0.8,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14),
+          Icon(icon, size: 13, color: colorScheme.onSurfaceVariant),
           const SizedBox(width: 5),
           Flexible(
             child: Text(
               text,
               style: theme.textTheme.labelSmall?.copyWith(
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
               ),
             ),
           ),
@@ -435,62 +456,87 @@ class _CheckInCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Material(
-      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.45),
-      borderRadius: BorderRadius.circular(28),
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: colorScheme.outlineVariant,
+          width: 1.0,
+        ),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.auto_awesome_rounded,
-                        size: 30,
-                        color: theme.colorScheme.primary,
+        child: Stack(
+          children: [
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 4,
+              child: ColoredBox(color: colorScheme.primary),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.auto_awesome_rounded,
+                            size: 26,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            'Espacio de reflexión',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '¿Qué estás haciendo ahora?',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.4,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Cuéntale a tu asistente SARA para registrar este momento y organizar los siguientes pasos de tu jornada.',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 18),
-                      Text(
-                        'Un espacio para ti',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        '¿Qué estás haciendo ahora?',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.6,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Cuéntame cómo vas. Podemos registrar este momento y elegir el siguiente paso.',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: onTap,
+                    icon: const Icon(Icons.forum_rounded, size: 18),
+                    label: const Text('Conversar con SARA'),
+                    style: FilledButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: onTap,
-                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
-                label: const Text('Contarle al agente'),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

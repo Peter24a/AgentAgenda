@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../models/agenda_view.dart';
 import 'beam_settings_sheet.dart';
+import '../screens/notifications/notification_settings_screen.dart';
 
 class AgendaHeader extends StatelessWidget {
   final DateTime selectedDate;
@@ -55,18 +56,47 @@ class AgendaHeader extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  'Tu agenda',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'SARA Agenda',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               TextButton(onPressed: onToday, child: const Text('Hoy')),
+              IconButton(
+                tooltip: 'Avisos y recordatorios',
+                icon: const Icon(Icons.notifications_outlined),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const NotificationSettingsScreen(),
+                  ),
+                ),
+              ),
               IconButton.filledTonal(
                 onPressed: onAddActivity,
                 icon: const Icon(Icons.add_rounded),
                 tooltip: 'Agregar actividad',
+                style: IconButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
               ),
               const SizedBox(width: 4),
               IconButton(
@@ -76,7 +106,7 @@ class AgendaHeader extends StatelessWidget {
                   builder: (_) => const BeamSettingsSheet(),
                 ),
                 icon: const Icon(Icons.tune_rounded),
-                tooltip: 'Personalizar apariencia',
+                tooltip: 'Ajustes de SARA',
               ),
             ],
           ),
@@ -93,11 +123,15 @@ class AgendaHeader extends StatelessWidget {
               selected: {view},
               onSelectionChanged: (selection) => onViewChanged(selection.first),
               style: SegmentedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                selectedBackgroundColor: theme.colorScheme.primaryContainer,
+                selectedForegroundColor: theme.colorScheme.onPrimaryContainer,
                 side: BorderSide(
-                  color: theme.colorScheme.outlineVariant.withValues(
-                    alpha: 0.6,
-                  ),
+                  color: theme.colorScheme.outlineVariant,
+                  width: 1.0,
                 ),
               ),
             ),

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -46,18 +45,13 @@ class ApiClient {
   static String get defaultPlatformUrl {
     const configured = String.fromEnvironment('BACKEND_URL');
     if (configured.isNotEmpty) return configured;
-    if (kIsWeb) return 'http://127.0.0.1:8001';
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.android:
-        return 'http://10.0.2.2:8001';
-      case TargetPlatform.iOS:
-      case TargetPlatform.macOS:
-      case TargetPlatform.linux:
-      case TargetPlatform.windows:
-      default:
-        return 'http://127.0.0.1:8001';
-    }
+    return 'https://agenda-api.pedroibarra.dev';
   }
+
+  static String get defaultAuthToken =>
+      const String.fromEnvironment('AUTH_TOKEN');
+  static String get defaultRefreshToken =>
+      const String.fromEnvironment('REFRESH_TOKEN');
 
   String _baseUrl = defaultPlatformUrl;
   String get baseUrl => _baseUrl;
@@ -73,8 +67,10 @@ class ApiClient {
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _baseUrl = prefs.getString(_prefKey) ?? defaultPlatformUrl;
-    _authToken = prefs.getString(_tokenPrefKey);
-    final refresh = prefs.getString(_refreshPrefKey);
+    final envToken = defaultAuthToken.isNotEmpty ? defaultAuthToken : null;
+    final envRefresh = defaultRefreshToken.isNotEmpty ? defaultRefreshToken : null;
+    _authToken = prefs.getString(_tokenPrefKey) ?? envToken;
+    final refresh = prefs.getString(_refreshPrefKey) ?? envRefresh;
     if (refresh != null && refresh.isNotEmpty) {
       try {
         final response = await http

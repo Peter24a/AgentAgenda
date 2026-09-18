@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../models/agenda_item.dart';
 
-/// Tarjeta de actividad ultra fluida con atmósfera estética de emojis.
-/// Optimizada sin BackdropFilter en listas para asegurar 120 FPS sin caídas de frames.
+/// Tarjeta de actividad con la identidad visual SARA (v0.4.0).
+/// Superficie sólida elevada (#FFFFFF / #1E1A22), radio de 12px,
+/// borde neutro sutil (#DED8E2 / #3D3544) y cero degradados.
 class AtmosphericCard extends StatelessWidget {
   final AgendaItem item;
   final VoidCallback onToggleComplete;
@@ -18,137 +19,129 @@ class AtmosphericCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
     final category = item.category;
 
-    final baseTint = category.tintColor;
-    final cardBgColor = isDark
-        ? Color.alphaBlend(baseTint.withValues(alpha: 0.16), theme.colorScheme.surfaceContainerHigh)
-        : Color.alphaBlend(baseTint.withValues(alpha: 0.10), theme.colorScheme.surfaceContainerLow);
-
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
       child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(28),
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        elevation: 0,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(12),
           child: Container(
             decoration: BoxDecoration(
-              color: cardBgColor,
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isDark
-                    ? baseTint.withValues(alpha: 0.22)
-                    : baseTint.withValues(alpha: 0.14),
-                width: 1.2,
+                color: item.isCompleted
+                    ? colorScheme.outlineVariant.withValues(alpha: 0.6)
+                    : colorScheme.outlineVariant,
+                width: 1.0,
               ),
             ),
             child: Stack(
               children: [
-                // Emojis atmosféricos en el fondo con opacidad suave
-                Positioned.fill(
-                  child: _AtmosphericEmojiBackground(
-                    emojis: category.backgroundEmojis,
-                    isCompleted: item.isCompleted,
+                // Indicador visual lateral de estado activo / ciruela SARA (WCAG 1.4.1)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: 4,
+                  child: ColoredBox(
+                    color: item.isCompleted
+                        ? colorScheme.outlineVariant
+                        : colorScheme.primary,
                   ),
                 ),
 
-                // Gradiente tonal suave para contraste legible
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          (isDark ? Colors.black : Colors.white).withValues(alpha: 0.30),
-                          Colors.transparent,
-                          (isDark ? Colors.black : Colors.white).withValues(alpha: 0.12),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Contenido principal de la tarjeta
                 Padding(
-                  padding: const EdgeInsets.all(20.0),
+                  padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
+                          // Chip de tiempo / categoría con radio de 8px
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
+                              horizontal: 10,
+                              vertical: 5,
                             ),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.surface.withValues(
-                                alpha: isDark ? 0.75 : 0.9,
-                              ),
-                              borderRadius: BorderRadius.circular(20),
+                              color: colorScheme.secondaryContainer,
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
                                   category.primaryEmoji,
-                                  style: const TextStyle(fontSize: 14),
+                                  style: const TextStyle(fontSize: 13),
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
                                   item.timeRange,
                                   style: theme.textTheme.labelMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.3,
+                                    fontWeight: FontWeight.w600,
+                                    color: colorScheme.onSurface,
+                                    letterSpacing: 0.2,
                                   ),
                                 ),
                               ],
                             ),
                           ),
                           const Spacer(),
-                          IconButton.filledTonal(
+
+                          // Botón de completar accesible
+                          IconButton(
                             onPressed: onToggleComplete,
                             icon: Icon(
                               item.isCompleted
                                   ? Icons.check_circle_rounded
                                   : Icons.radio_button_unchecked_rounded,
                               color: item.isCompleted
-                                  ? theme.colorScheme.primary
-                                  : theme.colorScheme.outline,
+                                  ? colorScheme.primary
+                                  : colorScheme.outline,
+                              size: 22,
                             ),
                             style: IconButton.styleFrom(
-                              backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.8),
-                              minimumSize: const Size(36, 36),
+                              minimumSize: const Size(44, 44),
                               padding: EdgeInsets.zero,
                             ),
+                            tooltip: item.isCompleted
+                                ? 'Marcar como pendiente'
+                                : 'Marcar como completada',
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
 
                       Text(
                         item.title,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          decoration: item.isCompleted ? TextDecoration.lineThrough : null,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          decoration: item.isCompleted
+                              ? TextDecoration.lineThrough
+                              : null,
                           color: item.isCompleted
-                              ? theme.colorScheme.onSurface.withValues(alpha: 0.5)
-                              : theme.colorScheme.onSurface,
+                              ? colorScheme.onSurface.withValues(alpha: 0.45)
+                              : colorScheme.onSurface,
                         ),
                       ),
 
-                      if (item.description != null && item.description!.isNotEmpty) ...[
+                      if (item.description != null &&
+                          item.description!.isNotEmpty) ...[
                         const SizedBox(height: 6),
                         Text(
                           item.description!,
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant
-                                .withValues(alpha: item.isCompleted ? 0.5 : 0.85),
+                            color: colorScheme.onSurfaceVariant.withValues(
+                              alpha: item.isCompleted ? 0.45 : 0.85,
+                            ),
+                            height: 1.4,
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -161,64 +154,6 @@ class AtmosphericCard extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _AtmosphericEmojiBackground extends StatelessWidget {
-  final List<String> emojis;
-  final bool isCompleted;
-
-  const _AtmosphericEmojiBackground({
-    required this.emojis,
-    required this.isCompleted,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final opacity = isCompleted ? 0.08 : 0.22;
-
-    return Opacity(
-      opacity: opacity,
-      child: Stack(
-        children: [
-          Positioned(
-            right: -10,
-            top: -15,
-            child: Text(
-              emojis.isNotEmpty ? emojis[0] : '✨',
-              style: const TextStyle(fontSize: 80),
-            ),
-          ),
-          if (emojis.length > 1)
-            Positioned(
-              left: 40,
-              bottom: -20,
-              child: Text(
-                emojis[1],
-                style: const TextStyle(fontSize: 60),
-              ),
-            ),
-          if (emojis.length > 2)
-            Positioned(
-              right: 80,
-              bottom: 10,
-              child: Text(
-                emojis[2],
-                style: const TextStyle(fontSize: 48),
-              ),
-            ),
-          if (emojis.length > 3)
-            Positioned(
-              left: -5,
-              top: 15,
-              child: Text(
-                emojis[3],
-                style: const TextStyle(fontSize: 42),
-              ),
-            ),
-        ],
       ),
     );
   }

@@ -68,6 +68,7 @@ class AgendaItem {
   final DateTime? endTime;
   final ActivityCategory category;
   final bool isCompleted;
+  final bool isProvisional;
 
   const AgendaItem({
     required this.id,
@@ -77,6 +78,7 @@ class AgendaItem {
     this.endTime,
     required this.category,
     this.isCompleted = false,
+    this.isProvisional = false,
   });
 
   String get formattedTime => DateFormat('HH:mm').format(startTime);
@@ -96,6 +98,7 @@ class AgendaItem {
     DateTime? endTime,
     ActivityCategory? category,
     bool? isCompleted,
+    bool? isProvisional,
   }) {
     return AgendaItem(
       id: id ?? this.id,
@@ -105,6 +108,7 @@ class AgendaItem {
       endTime: endTime ?? this.endTime,
       category: category ?? this.category,
       isCompleted: isCompleted ?? this.isCompleted,
+      isProvisional: isProvisional ?? this.isProvisional,
     );
   }
 
@@ -125,6 +129,19 @@ class AgendaItem {
           : null,
       category: cat,
       isCompleted: json['is_completed'] as bool? ?? false,
+      isProvisional:
+          json['is_provisional'] == true ||
+          json['requires_confirmation'] == true ||
+          RegExp(
+            r'\[(PROVISIONAL|CONDICIONAL)\]',
+            caseSensitive: false,
+          ).hasMatch('${json['title'] ?? ''} ${json['description'] ?? ''}') ||
+          const [
+            'provisional',
+            'proposed',
+            'draft',
+            'pending_approval',
+          ].contains(json['status']),
     );
   }
 

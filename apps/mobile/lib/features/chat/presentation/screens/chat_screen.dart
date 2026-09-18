@@ -102,7 +102,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages.add(
           ChatMessage(
             text:
-                'Ahora hay un espacio libre en tu horario. ¿Qué estás haciendo? '
+                '¿Cómo vas? Cuéntame qué estás haciendo ahora. '
                 'Tu respuesta quedará guardada con la hora para recordar cómo fue tu día.',
             isUser: false,
             timestamp: DateTime.now(),
@@ -240,9 +240,9 @@ class _ChatScreenState extends State<ChatScreen> {
               radius: 18,
               backgroundColor: theme.colorScheme.primaryContainer,
               child: Icon(
-                Icons.auto_awesome_rounded,
-                size: 20,
-                color: theme.colorScheme.onPrimaryContainer,
+                Icons.forum_rounded,
+                size: 18,
+                color: theme.colorScheme.primary,
               ),
             ),
             const SizedBox(width: 12),
@@ -250,13 +250,13 @@ class _ChatScreenState extends State<ChatScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Asistente Agenda',
+                  'Asistente SARA',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 Text(
-                  'Tu horario y contexto personal',
+                  'Productividad y Agenda',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.primary,
                     fontWeight: FontWeight.w600,
@@ -294,14 +294,18 @@ class _ChatScreenState extends State<ChatScreen> {
                         decoration: BoxDecoration(
                           color: msg.isUser
                               ? theme.colorScheme.primary
-                              : (isDark
-                                    ? theme.colorScheme.surfaceContainerHigh
-                                    : theme.colorScheme.surfaceContainerLow),
+                              : theme.colorScheme.surfaceContainerLow,
+                          border: msg.isUser
+                              ? null
+                              : Border.all(
+                                  color: theme.colorScheme.outlineVariant,
+                                  width: 1.0,
+                                ),
                           borderRadius: BorderRadius.only(
-                            topLeft: const Radius.circular(20),
-                            topRight: const Radius.circular(20),
-                            bottomLeft: Radius.circular(msg.isUser ? 20 : 4),
-                            bottomRight: Radius.circular(msg.isUser ? 4 : 20),
+                            topLeft: const Radius.circular(12),
+                            topRight: const Radius.circular(12),
+                            bottomLeft: Radius.circular(msg.isUser ? 12 : 3),
+                            bottomRight: Radius.circular(msg.isUser ? 3 : 12),
                           ),
                         ),
                         child: msg.isUser
@@ -504,15 +508,31 @@ class _ChatScreenState extends State<ChatScreen> {
                                   ? '¿Qué estás haciendo ahora?'
                                   : 'Pide reorganizar o consulta...'),
                         filled: true,
-                        fillColor: theme.colorScheme.surfaceContainerHighest
-                            .withValues(alpha: 0.5),
+                        fillColor: theme.colorScheme.surfaceContainerLow,
                         contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
+                          horizontal: 16,
                           vertical: 14,
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(28),
-                          borderSide: BorderSide.none,
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                            color: theme.colorScheme.outlineVariant,
+                            width: 1.0,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                            color: theme.colorScheme.outlineVariant,
+                            width: 1.0,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                            color: theme.colorScheme.primary,
+                            width: 1.5,
+                          ),
                         ),
                       ),
                       onSubmitted: (_) => _sendMessage(),
@@ -522,14 +542,22 @@ class _ChatScreenState extends State<ChatScreen> {
                   IconButton.filled(
                     onPressed: _isGenerating ? null : _sendMessage,
                     icon: _isGenerating
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: theme.colorScheme.onPrimary,
+                            ),
                           )
                         : const Icon(Icons.send_rounded),
                     style: IconButton.styleFrom(
-                      shape: const CircleBorder(),
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: theme.colorScheme.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      minimumSize: const Size(48, 48),
                       padding: const EdgeInsets.all(12),
                     ),
                   ),

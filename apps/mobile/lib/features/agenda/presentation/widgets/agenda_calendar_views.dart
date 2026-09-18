@@ -29,14 +29,15 @@ class AgendaWeekView extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
           child: Material(
             color: today
-                ? theme.colorScheme.primaryContainer.withValues(alpha: 0.4)
+                ? theme.colorScheme.primaryContainer
                 : theme.colorScheme.surfaceContainerLow,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(12),
               side: BorderSide(
                 color: today
-                    ? theme.colorScheme.primary.withValues(alpha: 0.5)
-                    : theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.outlineVariant,
+                width: 1.0,
               ),
             ),
             clipBehavior: Clip.antiAlias,
@@ -207,7 +208,13 @@ class AgendaMonthView extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
         color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: theme.colorScheme.outlineVariant,
+            width: 1.0,
+          ),
+        ),
         clipBehavior: Clip.antiAlias,
         child: Column(
           children: [

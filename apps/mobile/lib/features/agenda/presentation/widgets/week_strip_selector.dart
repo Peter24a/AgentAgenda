@@ -36,16 +36,23 @@ class WeekStripSelector extends StatelessWidget {
             padding: const EdgeInsets.only(right: 8.0),
             child: InkWell(
               onTap: () => onDateSelected(day),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(8),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
+                duration: const Duration(milliseconds: 180),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 52),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? theme.colorScheme.primary
-                      : theme.colorScheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(18),
+                      : theme.colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isSelected
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.outlineVariant,
+                    width: 1.0,
+                  ),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -54,7 +61,7 @@ class WeekStripSelector extends StatelessWidget {
                       dayLetter,
                       style: TextStyle(
                         fontSize: 11,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                         color: isSelected
                             ? theme.colorScheme.onPrimary
                             : theme.colorScheme.onSurfaceVariant,
@@ -65,7 +72,7 @@ class WeekStripSelector extends StatelessWidget {
                       dayNum,
                       style: TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: isSelected
                             ? theme.colorScheme.onPrimary
                             : theme.colorScheme.onSurface,

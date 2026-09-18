@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../../core/notifications/follow_up_service.dart';
 import '../../models/agenda_item.dart';
 import '../../models/agenda_view.dart';
 import '../../models/agent_proposal.dart';
@@ -42,14 +43,27 @@ class _AgendaScreenState extends State<AgendaScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _clock = Timer.periodic(const Duration(seconds: 30), (_) => _updateClock());
+    FollowUpService.instance.openCheckIn.addListener(_openNotificationCheckIn);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _openNotificationCheckIn(),
+    );
     _fetchData();
   }
 
   @override
   void dispose() {
     _clock?.cancel();
+    FollowUpService.instance.openCheckIn.removeListener(
+      _openNotificationCheckIn,
+    );
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _openNotificationCheckIn() {
+    if (!mounted || !FollowUpService.instance.openCheckIn.value) return;
+    FollowUpService.instance.openCheckIn.value = false;
+    _openAgentChat(checkIn: true);
   }
 
   @override
@@ -115,6 +129,7 @@ class _AgendaScreenState extends State<AgendaScreen>
         _activeProposal = proposal;
         _isLoading = false;
       });
+      unawaited(FollowUpService.instance.synchronize());
     } catch (_) {
       if (!mounted || request != _requestGeneration) return;
       setState(() {
@@ -176,6 +191,14 @@ class _AgendaScreenState extends State<AgendaScreen>
             _items = _items.map((it) => it.id == item.id ? item : it).toList(),
       );
       _showMessage('No se pudo guardar el cambio de actividad.');
+    } else {
+      if (!item.isCompleted) {
+        await FollowUpService.instance.removeEvent(
+          item.id,
+          occurrence: item.startTime,
+        );
+      }
+      unawaited(FollowUpService.instance.synchronize());
     }
   }
 
@@ -186,6 +209,8 @@ class _AgendaScreenState extends State<AgendaScreen>
     if (!mounted) return;
     if (success) {
       setState(() => _items.removeWhere((it) => it.id == item.id));
+      await FollowUpService.instance.removeEvent(item.id);
+      unawaited(FollowUpService.instance.synchronize());
       _showMessage('Actividad eliminada.');
     } else {
       _showMessage('No se pudo eliminar la actividad.');
