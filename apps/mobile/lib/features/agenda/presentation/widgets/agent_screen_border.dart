@@ -155,63 +155,75 @@ class _FastPathMetricBeamPainter extends CustomPainter {
     final totalLength = metric.length;
     if (totalLength <= 0) return;
 
-    // Longitud física del lazo luminoso (aprox. 220 dp)
-    final beamLength = math.min(size.height * 0.24, 230.0);
+    // Longitud física del lazo luminoso (aprox. 260 dp)
+    final beamLength = math.min(size.height * 0.28, 265.0);
     final headDist = (progress * totalLength) % totalLength;
 
     // Subdivisión en segmentos para degradado suave con velocidad lineal constante
-    const segments = 12;
+    const segments = 14;
     final segLen = beamLength / segments;
 
     // Preparar colores del lazo
     final isSara = option.name.contains('SARA');
     final isMulti = option.isMulticolor;
+    final primaryColor = isSara ? const Color(0xFF6B4F73) : option.primaryColor;
+    final accentColor = isSara ? const Color(0xFFC5AED0) : option.primaryColor;
 
-    // 1. Pase exterior: Halo de resplandor ambiental
-    final haloPath = _extractSubPath(metric, totalLength, headDist - beamLength, headDist);
+    // 1. Pase ambiental difuso (aura exterior amplia)
+    final auraPath = _extractSubPath(metric, totalLength, headDist - beamLength, headDist);
+    final auraPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 20.0
+      ..strokeCap = StrokeCap.round
+      ..color = primaryColor.withValues(alpha: 0.22)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9.0);
+    canvas.drawPath(auraPath, auraPaint);
+
+    // 2. Pase de halo medio (resplandor de cuerpo)
     final haloPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 6.0
+      ..strokeWidth = 12.0
       ..strokeCap = StrokeCap.round
-      ..color = (isSara ? const Color(0xFF6B4F73) : option.primaryColor).withValues(alpha: 0.28)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5);
-    canvas.drawPath(haloPath, haloPaint);
+      ..color = accentColor.withValues(alpha: 0.46)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.5);
+    canvas.drawPath(auraPath, haloPaint);
 
-    // 2. Pase principal: Núcleo trazado con gradiente progresivo
+    // 3. Pase principal: Núcleo trazado con gradiente progresivo y grosor calibrado
     for (int i = 0; i < segments; i++) {
       final t = (i + 1) / segments;
       final start = headDist - beamLength + (i * segLen);
-      final end = headDist - beamLength + ((i + 1) * segLen) + 1.2; // Traslape para continuidad
+      final end = headDist - beamLength + ((i + 1) * segLen) + 2.0; // Traslape amplio para continuidad
 
       final segPath = _extractSubPath(metric, totalLength, start, end);
 
       Color segColor;
       if (isSara) {
-        if (t < 0.40) {
-          segColor = const Color(0xFF6B4F73).withValues(alpha: 0.15 + (t / 0.40) * 0.45);
-        } else if (t < 0.75) {
-          final factor = (t - 0.40) / 0.35;
+        if (t < 0.35) {
+          segColor = const Color(0xFF6B4F73).withValues(alpha: 0.25 + (t / 0.35) * 0.45);
+        } else if (t < 0.70) {
+          final factor = (t - 0.35) / 0.35;
           segColor = Color.lerp(const Color(0xFF6B4F73), const Color(0xFF9E80A8), factor)!
-              .withValues(alpha: 0.60 + factor * 0.25);
-        } else if (t < 0.93) {
-          final factor = (t - 0.75) / 0.18;
+              .withValues(alpha: 0.70 + factor * 0.22);
+        } else if (t < 0.90) {
+          final factor = (t - 0.70) / 0.20;
           segColor = Color.lerp(const Color(0xFF9E80A8), const Color(0xFFC5AED0), factor)!
-              .withValues(alpha: 0.85 + factor * 0.12);
+              .withValues(alpha: 0.92 + factor * 0.08);
         } else {
-          segColor = Colors.white.withValues(alpha: 0.98);
+          segColor = Colors.white;
         }
       } else if (isMulti) {
         final colors = option.colors;
         final idx = (t * (colors.length - 1)).clamp(0, colors.length - 1).toInt();
-        segColor = (t > 0.94 ? Colors.white : colors[idx]).withValues(alpha: 0.25 + t * 0.72);
+        segColor = (t > 0.92 ? Colors.white : colors[idx]).withValues(alpha: 0.35 + t * 0.65);
       } else {
-        segColor = (t > 0.93
+        segColor = (t > 0.90
                 ? Colors.white
                 : Color.lerp(option.primaryColor, Colors.white, t * 0.4)!)
-            .withValues(alpha: 0.15 + t * 0.82);
+            .withValues(alpha: 0.25 + t * 0.75);
       }
 
-      final strokeW = 1.8 + (t * 1.6);
+      // Grosor sólido y visible: desde 3.2 dp en la cola hasta 7.2 dp en la cabeza
+      final strokeW = 3.2 + (t * 4.0);
       final segPaint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = strokeW
@@ -221,7 +233,7 @@ class _FastPathMetricBeamPainter extends CustomPainter {
       canvas.drawPath(segPath, segPaint);
     }
 
-    // 3. Cabeza luminosa con chispa perla
+    // 4. Cabeza luminosa de alto impacto con chispa perla
     final tangent = metric.getTangentForOffset(headDist);
     if (tangent != null) {
       final headPos = tangent.position;
@@ -229,16 +241,16 @@ class _FastPathMetricBeamPainter extends CustomPainter {
       // Resplandor difuso en la punta
       canvas.drawCircle(
         headPos,
-        5.5,
+        10.0,
         Paint()
-          ..color = (isSara ? const Color(0xFFC5AED0) : option.primaryColor).withValues(alpha: 0.6)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+          ..color = accentColor.withValues(alpha: 0.80)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0),
       );
 
       // Núcleo blanco nítido
       canvas.drawCircle(
         headPos,
-        2.2,
+        4.2,
         Paint()..color = Colors.white,
       );
     }

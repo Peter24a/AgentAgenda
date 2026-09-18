@@ -282,17 +282,17 @@ class _SaraLoopIconPainter extends CustomPainter {
 
     final path = _createLemniscatePath(cx, cy, w, h, -0.22);
 
-    // Trazo base del lazo isotipo
+    // Trazo base del lazo isotipo (reforzado para pantallas de alta densidad)
     final basePaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
+      ..strokeWidth = 2.6
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
-      ..color = color.withValues(alpha: 0.90);
+      ..color = color.withValues(alpha: 0.95);
 
     canvas.drawPath(path, basePaint);
 
-    // Chispa luminosa que recorre el isotipo sutilmente
+    // Chispa luminosa que recorre el isotipo con nitidez
     final metrics = path.computeMetrics().toList();
     if (metrics.isNotEmpty) {
       final metric = metrics.first;
@@ -303,16 +303,16 @@ class _SaraLoopIconPainter extends CustomPainter {
         // Chispa blanca en cabeza
         canvas.drawCircle(
           tangent.position,
-          1.4,
+          2.0,
           Paint()..color = Colors.white,
         );
         // Aura suave de la chispa
         canvas.drawCircle(
           tangent.position,
-          3.0,
+          4.5,
           Paint()
-            ..color = color.withValues(alpha: 0.5)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5),
+            ..color = color.withValues(alpha: 0.65)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0),
         );
       }
     }
@@ -408,64 +408,75 @@ class SaraLoopBurstPainter extends CustomPainter {
     final headDist = (progress * 2.0 * totalLen) % totalLen;
     final beamLength = totalLen * 0.45;
 
-    // 1. Resplandor exterior difuso
+    // 1. Pase exterior ambiental amplio
     final glowPath = _extractSubPath(metric, totalLen, headDist - beamLength, headDist);
+    final auraPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 24.0
+      ..strokeCap = StrokeCap.round
+      ..color = const Color(0xFF6B4F73).withValues(alpha: 0.28 * alphaFade)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10.0);
+    canvas.drawPath(glowPath, auraPaint);
+
+    // 2. Pase de halo medio vibrante
     final glowPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 7.0
+      ..strokeWidth = 14.0
       ..strokeCap = StrokeCap.round
-      ..color = const Color(0xFFC5AED0).withValues(alpha: 0.45 * alphaFade)
+      ..color = const Color(0xFFC5AED0).withValues(alpha: 0.58 * alphaFade)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
     canvas.drawPath(glowPath, glowPaint);
 
-    // 2. Núcleo cromático en degradado SARA (Ciruela -> Malva -> Blanco)
-    const segments = 10;
+    // 3. Núcleo cromático en degradado SARA (Ciruela -> Malva -> Blanco)
+    const segments = 12;
     final segLen = beamLength / segments;
 
     for (int i = 0; i < segments; i++) {
       final t = (i + 1) / segments;
       final start = headDist - beamLength + (i * segLen);
-      final end = headDist - beamLength + ((i + 1) * segLen) + 1.5;
+      final end = headDist - beamLength + ((i + 1) * segLen) + 2.0;
 
       final segPath = _extractSubPath(metric, totalLen, start, end);
 
       Color segColor;
       if (t < 0.35) {
         segColor = const Color(0xFF6B4F73)
-            .withValues(alpha: (0.2 + t * 1.5) * alphaFade);
+            .withValues(alpha: (0.35 + t * 1.5) * alphaFade);
       } else if (t < 0.80) {
         final f = (t - 0.35) / 0.45;
         segColor = Color.lerp(const Color(0xFF6B4F73), const Color(0xFFC5AED0), f)!
-            .withValues(alpha: (0.6 + f * 0.35) * alphaFade);
+            .withValues(alpha: (0.75 + f * 0.25) * alphaFade);
       } else {
-        segColor = Colors.white.withValues(alpha: 0.98 * alphaFade);
+        segColor = Colors.white.withValues(alpha: alphaFade);
       }
 
+      // Grosor robusto: desde 3.8 dp hasta 8.2 dp
+      final strokeW = 3.8 + (t * 4.4);
       final segPaint = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0 + (t * 2.0)
+        ..strokeWidth = strokeW
         ..strokeCap = StrokeCap.round
         ..color = segColor;
 
       canvas.drawPath(segPath, segPaint);
     }
 
-    // 3. Cabeza de chispa luminosa
+    // 4. Cabeza de chispa luminosa amplificada
     final tangent = metric.getTangentForOffset(headDist);
     if (tangent != null) {
       final headPos = tangent.position;
 
       canvas.drawCircle(
         headPos,
-        6.0,
+        10.0,
         Paint()
-          ..color = const Color(0xFFC5AED0).withValues(alpha: 0.7 * alphaFade)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0),
+          ..color = const Color(0xFFC5AED0).withValues(alpha: 0.85 * alphaFade)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0),
       );
 
       canvas.drawCircle(
         headPos,
-        2.5,
+        4.2,
         Paint()..color = Colors.white.withValues(alpha: alphaFade),
       );
     }

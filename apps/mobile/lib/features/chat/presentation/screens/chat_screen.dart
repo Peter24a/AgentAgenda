@@ -226,6 +226,33 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  /// Limpia citas documentales internas ([D1], [D2]) y apéndices técnicos
+  /// de procedencia para ofrecer una experiencia conversacional limpia y ejecutiva.
+  String _cleanMessageText(String text) {
+    if (text.isEmpty) return text;
+    var cleaned = text;
+
+    // 1. Omitir el bloque de apéndice de fuentes documentales
+    final appendixIndex = cleaned.indexOf('\n\n---\nFuentes disponibles');
+    if (appendixIndex != -1) {
+      cleaned = cleaned.substring(0, appendixIndex);
+    }
+    final altAppendixIndex = cleaned.indexOf('---\nFuentes disponibles');
+    if (altAppendixIndex != -1) {
+      cleaned = cleaned.substring(0, altAppendixIndex);
+    }
+    final plainAppendixIndex =
+        cleaned.indexOf('Fuentes disponibles para esta respuesta:');
+    if (plainAppendixIndex != -1) {
+      cleaned = cleaned.substring(0, plainAppendixIndex);
+    }
+
+    // 2. Eliminar referencias entre corchetes tipo [D1], [D2], etc.
+    cleaned = cleaned.replaceAll(RegExp(r'\s*\[D\d+\]'), '');
+
+    return cleaned.trimRight();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -343,7 +370,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                       ],
                                     )
                                   : MarkdownBody(
-                                      data: msg.text,
+                                      data: _cleanMessageText(msg.text),
                                       selectable: true,
                                       softLineBreak: true,
                                       styleSheet:
