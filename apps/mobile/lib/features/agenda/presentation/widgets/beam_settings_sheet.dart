@@ -187,9 +187,86 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
                     contentPadding: EdgeInsets.zero,
                   ),
                   if (enabled) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Text(
-                      'Estilo de lazo:',
+                      'Trayectoria del lazo:',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ValueListenableBuilder<BeamPathStyle>(
+                      valueListenable: BeamColorConfig.currentPathStyle,
+                      builder: (context, currentStyle, _) {
+                        return Column(
+                          children: BeamPathStyle.values.map((style) {
+                            final isSelected = style == currentStyle;
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? colorScheme.secondaryContainer
+                                    : colorScheme.surfaceContainerLow,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? colorScheme.primary
+                                      : colorScheme.outlineVariant,
+                                  width: isSelected ? 1.5 : 1.0,
+                                ),
+                              ),
+                              child: ListTile(
+                                dense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 2,
+                                ),
+                                leading: Icon(
+                                  style == BeamPathStyle.saraAssistantLoop
+                                      ? Icons.all_inclusive_rounded
+                                      : Icons.crop_square_rounded,
+                                  color: isSelected
+                                      ? colorScheme.primary
+                                      : colorScheme.onSurfaceVariant,
+                                ),
+                                title: Text(
+                                  style.label,
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    fontWeight: isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: isSelected
+                                        ? colorScheme.onSecondaryContainer
+                                        : colorScheme.onSurface,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  style.description,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                                trailing: Icon(
+                                  isSelected
+                                      ? Icons.radio_button_checked_rounded
+                                      : Icons.radio_button_unchecked_rounded,
+                                  color: isSelected
+                                      ? colorScheme.primary
+                                      : colorScheme.outline,
+                                  size: 20,
+                                ),
+                                onTap: () =>
+                                    BeamColorConfig.currentPathStyle.value = style,
+                              ),
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Paleta cromática:',
                       style: theme.textTheme.labelMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),

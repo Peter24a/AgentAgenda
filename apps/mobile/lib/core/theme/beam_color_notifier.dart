@@ -65,6 +65,24 @@ class BeamColorConfig {
       ValueNotifier<BeamThemeOption>(options[0]);
 
   static final ValueNotifier<bool> isEnabled = ValueNotifier<bool>(true);
+
+  static final ValueNotifier<BeamPathStyle> currentPathStyle =
+      ValueNotifier<BeamPathStyle>(BeamPathStyle.saraAssistantLoop);
+}
+
+enum BeamPathStyle {
+  saraAssistantLoop(
+    'Bucle SARA en Asistente',
+    'El lazo desciende por el bisel y realiza un bucle en el botón del asistente.',
+  ),
+  fullBezel(
+    'Bisel Perimetral Completo',
+    'El lazo recorre el contorno exterior adaptado al radio de pantalla.',
+  );
+
+  final String label;
+  final String description;
+  const BeamPathStyle(this.label, this.description);
 }
 
 class BeamThemeOption {
