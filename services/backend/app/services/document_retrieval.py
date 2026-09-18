@@ -20,11 +20,11 @@ from app.models.canonical import Document, DocumentOrigin, DocumentRevision
 from app.services.context_visibility import safe_document_filters
 
 
-# The deployed model has an 8192-token window. Reserve 1024 tokens for output and
-# extra room for its chat template/tokenizer. UTF-8 bytes / 2 is deliberately
+# The deployed model supports extended context (up to 32768 tokens unified).
+# Reserve 2048 tokens for output and extra room for its chat template/tokenizer. UTF-8 bytes / 2 is deliberately
 # conservative for ordinary Spanish prose; it is an estimate, not a tokenizer.
-PROMPT_TOKEN_BUDGET = 6144
-OUTPUT_TOKEN_BUDGET = 1024
+PROMPT_TOKEN_BUDGET = 18432
+OUTPUT_TOKEN_BUDGET = 2048
 MESSAGE_OVERHEAD_TOKENS = 12
 
 _STOP_WORDS = set("""
@@ -384,7 +384,7 @@ def _bounded_evidence(passages: list[DocumentPassage], token_budget: int) -> lis
     return records
 
 
-def format_document_context(passages: list[DocumentPassage], token_budget: int = 3000) -> str:
+def format_document_context(passages: list[DocumentPassage], token_budget: int = 9000) -> str:
     records = _bounded_evidence(passages, token_budget - estimate_tokens(_CONTEXT_PREFIX))
     if not records:
         return clip_to_tokens(
@@ -479,7 +479,7 @@ async def search_documents(
     query: str,
     *,
     limit: int = 5,
-    token_budget: int = 3000,
+    token_budget: int = 9000,
 ) -> list[dict]:
     """Return the same bounded evidence used by chat for API/CLI inspection."""
     passages = await document_retrieval.search(session, user_id, query, limit=limit)

@@ -136,7 +136,7 @@ async def forget_memory(
 async def get_context(
     purpose: str = Query("general_chat", description="Propósito del contexto"),
     as_of: Optional[datetime] = Query(None, description="Fecha de referencia"),
-    token_budget: int = Query(2048, ge=256, le=8192),
+    token_budget: int = Query(6144, ge=256, le=24576),
     include_agenda: bool = Query(True),
     include_memories: bool = Query(True),
     session: AsyncSession = Depends(get_db_session),

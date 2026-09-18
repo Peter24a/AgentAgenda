@@ -23,7 +23,7 @@ class Arguments(BaseModel):
 
 class ContextArguments(Arguments):
     purpose: str = Field("external_agent", max_length=200)
-    token_budget: int = Field(2048, ge=256, le=8192)
+    token_budget: int = Field(6144, ge=256, le=24576)
     as_of: str | None = None
     timezone: str = "America/Mexico_City"
 

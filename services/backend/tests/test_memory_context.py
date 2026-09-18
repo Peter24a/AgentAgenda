@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import pytest
 import pytest_asyncio
+from app.models.memory import ContextAssembleRequest
 
 
 @pytest_asyncio.fixture
@@ -219,3 +220,21 @@ async def test_context_engine_assembly_and_budget(client, auth_headers):
 
     # 5. Presupuesto estricto de tokens
     assert ctx["estimated_tokens"] <= ctx["token_budget"]
+    assert ctx["token_budget"] == 6144
+
+
+@pytest.mark.asyncio
+async def test_tripled_token_budget_defaults_and_limits(client, auth_headers):
+    # ContextAssembleRequest default
+    req = ContextAssembleRequest(purpose="check_budget")
+    assert req.token_budget == 6144
+
+    # GET /v1/context default
+    res = await client.get("/v1/context?purpose=test_budget", headers=auth_headers)
+    assert res.status_code == 200
+    assert res.json()["token_budget"] == 6144
+
+    # Upper bound accepts up to 24576
+    large_req = ContextAssembleRequest(purpose="large", token_budget=24576)
+    assert large_req.token_budget == 24576
+

@@ -55,11 +55,11 @@ def build_llm_messages(
     memory_context: str = "",
     current_time: str = "",
 ) -> List[Dict[str, str]]:
-    # Create compact context representation (~50-100 tokens)
+    # Create compact context representation (~150-300 tokens)
     events_str = clip_to_tokens("\n".join([
         f"- [id:{e.id}] [{e.start_time.strftime('%H:%M')} a {e.end_time.strftime('%H:%M') if e.end_time else '?'}] {e.title} ({e.category.value})"
         for e in events
-    ]) or "No hay actividades registradas aún para esta fecha.", 600)
+    ]) or "No hay actividades registradas aún para esta fecha.", 1800)
 
     context_prompt = (
         f"{SYSTEM_PROMPT}\n\n"
@@ -72,21 +72,21 @@ def build_llm_messages(
 
     # Budget all messages, reserving model output and chat-template overhead.
     # Source documents stay in a separate data message, outside system rules.
-    user_message = clip_to_tokens(user_message, 1800)
+    user_message = clip_to_tokens(user_message, 5400)
     remaining = (
         PROMPT_TOKEN_BUDGET - estimate_tokens(context_prompt)
         - estimate_tokens(user_message) - 3 * MESSAGE_OVERHEAD_TOKENS
     )
-    memory_context = clip_to_tokens(memory_context, max(0, min(650, remaining - 1200)))
+    memory_context = clip_to_tokens(memory_context, max(0, min(1950, remaining - 2400)))
     remaining -= estimate_tokens(memory_context) + (MESSAGE_OVERHEAD_TOKENS if memory_context else 0)
-    document_context = fit_document_context(document_context, max(0, min(3000, remaining - 300)))
+    document_context = fit_document_context(document_context, max(0, min(9000, remaining - 900)))
     remaining -= estimate_tokens(document_context)
 
     history_messages = []
     # Newest messages have priority, but a single pasted document cannot fill
     # the complete context window. Preserve chronological order after selection.
-    for msg in reversed(history[-6:]):
-        available = min(450, remaining - MESSAGE_OVERHEAD_TOKENS)
+    for msg in reversed(history[-18:]):
+        available = min(1350, remaining - MESSAGE_OVERHEAD_TOKENS)
         if available < 40:
             break
         content = clip_to_tokens(msg.text, available)

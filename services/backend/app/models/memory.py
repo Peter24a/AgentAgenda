@@ -83,7 +83,7 @@ class MemoryForgetRequest(BaseModel):
 class ContextAssembleRequest(BaseModel):
     purpose: str = Field("general_chat", description="Propósito del contexto (general_chat, agenda_planning, document_preparation)")
     as_of: Optional[datetime] = Field(None, description="Fecha de referencia para evaluar hechos y eventos de la agenda")
-    token_budget: int = Field(2048, ge=256, le=8192, description="Presupuesto máximo estimado de tokens")
+    token_budget: int = Field(6144, ge=256, le=24576, description="Presupuesto máximo estimado de tokens")
     include_agenda: bool = Field(True, description="Incluir actividades y tareas del día")
     include_memories: bool = Field(True, description="Incluir hechos y preferencias relevantes")
     timezone: Optional[str] = None
