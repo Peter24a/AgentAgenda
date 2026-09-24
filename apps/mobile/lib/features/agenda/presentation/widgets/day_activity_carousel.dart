@@ -11,7 +11,7 @@ class DayActivityCarousel extends StatefulWidget {
   final bool showCheckIn;
   final VoidCallback onCheckIn;
   final ValueChanged<AgendaItem> onOpenItem;
-  final ValueChanged<AgendaItem> onToggleItem;
+  final ValueChanged<AgendaItem> onDiscussItem;
 
   const DayActivityCarousel({
     super.key,
@@ -21,7 +21,7 @@ class DayActivityCarousel extends StatefulWidget {
     required this.showCheckIn,
     required this.onCheckIn,
     required this.onOpenItem,
-    required this.onToggleItem,
+    required this.onDiscussItem,
   });
 
   @override
@@ -42,7 +42,7 @@ class _DayActivityCarouselState extends State<DayActivityCarousel> {
     final entries = <AgendaItem?>[...widget.items];
     if (widget.showCheckIn) {
       final next = entries.indexWhere(
-        (item) => !item!.isCompleted && item.startTime.isAfter(widget.now),
+        (item) => item!.startTime.isAfter(widget.now),
       );
       entries.insert(next < 0 ? entries.length : next, null);
     }
@@ -57,16 +57,12 @@ class _DayActivityCarouselState extends State<DayActivityCarousel> {
     final active = _entries.indexWhere(
       (item) =>
           item != null &&
-          !item.isCompleted &&
           !item.startTime.isAfter(widget.now) &&
           agendaEventEnd(item).isAfter(widget.now),
     );
     if (active >= 0) return active;
     final next = _entries.indexWhere(
-      (item) =>
-          item != null &&
-          !item.isCompleted &&
-          item.startTime.isAfter(widget.now),
+      (item) => item != null && item.startTime.isAfter(widget.now),
     );
     return next >= 0 ? next : (_entries.length - 1).clamp(0, _entries.length);
   }
@@ -204,7 +200,7 @@ class _DayActivityCarouselState extends State<DayActivityCarousel> {
                             item: item,
                             now: widget.now,
                             onTap: () => widget.onOpenItem(item),
-                            onToggle: () => widget.onToggleItem(item),
+                            onDiscuss: () => widget.onDiscussItem(item),
                           ),
                   );
                 },
@@ -240,13 +236,13 @@ class _ActivityCard extends StatelessWidget {
   final AgendaItem item;
   final DateTime now;
   final VoidCallback onTap;
-  final VoidCallback onToggle;
+  final VoidCallback onDiscuss;
 
   const _ActivityCard({
     required this.item,
     required this.now,
     required this.onTap,
-    required this.onToggle,
+    required this.onDiscuss,
   });
 
   @override
@@ -254,12 +250,9 @@ class _ActivityCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final active =
-        !item.isCompleted &&
-        !item.startTime.isAfter(now) &&
-        agendaEventEnd(item).isAfter(now);
-    final label = item.isCompleted
-        ? 'Completada'
-        : active
+        !item.startTime.isAfter(now) && agendaEventEnd(item).isAfter(now);
+    final isPast = agendaEventEnd(item).isBefore(now);
+    final label = active
         ? 'Ahora · En curso'
         : agendaEventEnd(item).isBefore(now)
         ? 'Anterior'
@@ -272,10 +265,7 @@ class _ActivityCard extends StatelessWidget {
       color: colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: colorScheme.outlineVariant,
-          width: 1.0,
-        ),
+        side: BorderSide(color: colorScheme.outlineVariant, width: 1.0),
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -287,9 +277,11 @@ class _ActivityCard extends StatelessWidget {
             bottom: 0,
             width: 4,
             child: ColoredBox(
-              color: item.isCompleted
+              color: isPast
                   ? colorScheme.outlineVariant
-                  : (active ? colorScheme.primary : colorScheme.primary.withValues(alpha: 0.5)),
+                  : (active
+                        ? colorScheme.primary
+                        : colorScheme.primary.withValues(alpha: 0.5)),
             ),
           ),
 
@@ -355,10 +347,8 @@ class _ActivityCard extends StatelessWidget {
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w700,
                             letterSpacing: -0.3,
-                            decoration: item.isCompleted
-                                ? TextDecoration.lineThrough
-                                : null,
-                            color: item.isCompleted
+                            decoration: null,
+                            color: isPast
                                 ? colorScheme.onSurface.withValues(alpha: 0.45)
                                 : colorScheme.onSurface,
                           ),
@@ -370,7 +360,7 @@ class _ActivityCard extends StatelessWidget {
                               : 'Actividad programada en SARA Agenda.',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: colorScheme.onSurfaceVariant.withValues(
-                              alpha: item.isCompleted ? 0.45 : 0.85,
+                              alpha: isPast ? 0.45 : 0.85,
                             ),
                             height: 1.4,
                           ),
@@ -383,24 +373,14 @@ class _ActivityCard extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: TextButton.icon(
-                    onPressed: onToggle,
+                    onPressed: onDiscuss,
                     style: TextButton.styleFrom(
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    icon: Icon(
-                      item.isCompleted
-                          ? Icons.check_circle_rounded
-                          : Icons.radio_button_unchecked_rounded,
-                      size: 20,
-                      color: item.isCompleted
-                          ? colorScheme.primary
-                          : colorScheme.outline,
-                    ),
-                    label: Text(
-                      item.isCompleted ? 'Completada' : 'Marcar como realizada',
-                    ),
+                    icon: const Icon(Icons.chat_bubble_outline, size: 20),
+                    label: const Text('Platicar cómo me fue'),
                   ),
                 ),
               ],
@@ -425,10 +405,7 @@ class _Pill extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorScheme.secondaryContainer,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: colorScheme.outlineVariant,
-          width: 0.8,
-        ),
+        border: Border.all(color: colorScheme.outlineVariant, width: 0.8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -461,10 +438,7 @@ class _CheckInCard extends StatelessWidget {
       color: colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: colorScheme.outlineVariant,
-          width: 1.0,
-        ),
+        side: BorderSide(color: colorScheme.outlineVariant, width: 1.0),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(

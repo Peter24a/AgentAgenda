@@ -90,9 +90,14 @@ def _path_policy(path, relative):
         return 'excluded', 'secret_or_blocked_path', {}, 'NEVER_UPLOAD'
     if any(word in name for word in ('password', 'contrase', 'recovery', 'recuperacion', 'never_upload', 'credential', 'credencial', 'api_key', 'apikey')):
         return 'excluded', 'credential_filename', {}, 'NEVER_UPLOAD'
+    # Official originals and financial identifiers are not ordinary OPT_IN notes.
+    if path.suffix.lower() not in {'.md', '.txt'} and (
+        parts & {'identidad', 'fiscal', '04_finanzas_privado', 'finanzas', 'bancos', 'infonavit'} or re.search(r'(passport|pasaporte|curp|clabe|swift|\bnss\b|\brfc\b|acta|kardex|estado.?de.?cuenta|recibo|comprobante|boleto|boletos|ticket|identificaci|credencial)', name)
+    ):
+        return 'excluded', 'official_or_identifier_original', {}, 'NEVER_UPLOAD'
     if path.suffix.lower() not in SUPPORTED:
         return 'excluded', 'unsupported_format', {}, 'UNCLASSIFIED'
-    if parts & OPERATIONAL_DIRS or name in {'agents.md', 'leeme.txt', 'changelog.md'} or name.startswith('readme') or 'plantilla' in name:
+    if parts & OPERATIONAL_DIRS or name in {'agents.md', 'leeme.txt', 'changelog.md', 'inbox.md'} or name.startswith('readme') or 'plantilla' in name:
         return 'excluded', 'instructions_template_or_derived', {}, 'UNCLASSIFIED'
     if '00_inicio' in parts and name not in {'perfil_breve.md', 'glosario.md'}:
         return 'excluded', 'operational_document', {}, 'UNCLASSIFIED'

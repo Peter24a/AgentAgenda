@@ -3,6 +3,7 @@ from typing import List, Optional
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer, noload
 
 from app.models.canonical import Document, DocumentRevision
 from app.models.document import (
@@ -21,6 +22,7 @@ class DocumentCatalogService:
         doc_type: Optional[str] = None,
         limit: int = 50,
         offset: int = 0,
+        include_text: bool = True,
     ) -> DocumentListResponse:
         filters = [
             Document.user_id == user_id,
@@ -49,6 +51,7 @@ class DocumentCatalogService:
         # Obtener documentos paginados
         stmt = (
             select(Document)
+            .options(noload(Document.revisions))
             .where(*filters)
             .order_by(Document.updated_at.desc(), Document.created_at.desc())
             .limit(limit)
@@ -66,13 +69,21 @@ class DocumentCatalogService:
             .where(DocumentRevision.document_id.in_(doc_ids))
             .order_by(DocumentRevision.version.asc())
         )
+        if not include_text:
+            rev_stmt = rev_stmt.options(defer(DocumentRevision.extracted_text))
         rev_res = await session.execute(rev_stmt)
         all_revisions = list(rev_res.scalars().all())
 
         rev_map = {d.id: [] for d in docs}
         for r in all_revisions:
             if r.document_id in rev_map:
-                rev_map[r.document_id].append(DocumentRevisionResponse.model_validate(r))
+                rev_map[r.document_id].append(
+                    DocumentRevisionResponse.model_validate(r) if include_text else
+                    DocumentRevisionResponse(**{
+                        field: getattr(r, field) for field in DocumentRevisionResponse.model_fields
+                        if field != "extracted_text"
+                    })
+                )
 
         doc_responses = []
         for d in docs:

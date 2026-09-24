@@ -32,6 +32,7 @@ def extract_proposal_from_text(text: str) -> Tuple[Optional[AgentProposalModel],
 
             resulting_items.append(AgendaItemModel(
                 id=item_id,
+                action=it.get("action", "upsert"),
                 title=it.get("title", "Actividad"),
                 description=it.get("description"),
                 start_time=start_dt,

@@ -312,3 +312,32 @@ class DocumentOrigin(Base):
     metadata_json = Column(JSON, nullable=True)
     batch_id = Column(String(64), ForeignKey("import_batches.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class DocumentContextGrant(Base):
+    __tablename__ = "document_context_grants"
+    id = Column(String(64), primary_key=True)
+    user_id = Column(String(64), nullable=False, index=True)
+    document_id = Column(String(64), ForeignKey("documents.id"), nullable=False)
+    revision_id = Column(String(64), ForeignKey("document_revisions.id"), nullable=False)
+    recipient_id = Column(String(128), nullable=False, index=True)
+    reason = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    revoked_at = Column(DateTime, nullable=True)
+
+
+class WeeklyRoutine(Base):
+    __tablename__ = 'weekly_routines'
+    id = Column(String(64), primary_key=True)
+    user_id = Column(String(64), nullable=False, index=True)
+    name = Column(String(256), nullable=False)
+    timezone = Column(String(64), nullable=False, default='America/Mexico_City')
+    starts_on = Column(String(10), nullable=False)
+    ends_on = Column(String(10), nullable=True)
+    template_json = Column(JSON, nullable=False)
+    enabled = Column(Boolean, nullable=False, default=True)
+    generation = Column(Integer, nullable=False, default=1)
+    materialized_through = Column(String(10), nullable=True)
+    last_materialized_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)

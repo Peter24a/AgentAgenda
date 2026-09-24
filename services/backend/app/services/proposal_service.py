@@ -112,6 +112,17 @@ class ProposalService:
             res_evt = await session.execute(evt_stmt)
             evt = res_evt.scalar_one_or_none()
 
+            if it.get("action") == "delete":
+                if not evt or evt.is_deleted:
+                    raise ValueError("La actividad que quieres cancelar ya no está disponible")
+                evt.is_deleted = True
+                evt.version += 1
+                evt.updated_at = datetime.utcnow()
+                agenda_service._record_change(session, head, evt, "event", "delete")
+                continue
+            if evt and evt.is_deleted:
+                raise ValueError("La actividad fue eliminada; pide una propuesta nueva")
+
             action = "update" if evt else "create"
             if evt:
                 evt.title = it.get("title", evt.title)

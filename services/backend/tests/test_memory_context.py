@@ -202,7 +202,7 @@ async def test_context_engine_assembly_and_budget(client, auth_headers):
     )
 
     # 4. Ensamblar contexto
-    ctx_res = await client.get("/v1/context?purpose=agenda_review", headers=auth_headers)
+    ctx_res = await client.get("/v1/context", params={"purpose":"agenda_review", "as_of":(now + timedelta(hours=2)).isoformat()}, headers=auth_headers)
     assert ctx_res.status_code == 200
     ctx = ctx_res.json()
     assembled = ctx["assembled_context"]

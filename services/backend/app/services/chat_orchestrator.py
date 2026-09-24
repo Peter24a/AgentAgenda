@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from datetime import datetime, timezone
 from typing import AsyncGenerator, Dict, List, Optional, Tuple
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_, exists
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_context
@@ -27,6 +27,7 @@ from app.services.prompt_builder import build_llm_messages
 from app.services.proposal_parser import extract_proposal_from_text
 from app.services.proposal_service import proposal_service
 from app.services.context_engine import context_engine
+from app.services.file_delivery import file_delivery_response
 
 
 class ChatOrchestrator:
@@ -90,6 +91,7 @@ class ChatOrchestrator:
                 date_str=req.date,
                 iana_timezone=req.timezone or "America/Mexico_City",
                 explicit_history=req.history,
+                context_recipient=f"device:{device_id}" if device_id else None,
                 allow_document_context=allow_document_context,
                 allow_memory_context=allow_memory_context,
             )
@@ -113,6 +115,7 @@ class ChatOrchestrator:
         date_str: Optional[str],
         iana_timezone: str = "America/Mexico_City",
         explicit_history: Optional[List[ChatMessageModel]] = None,
+        context_recipient: Optional[str] = None,
         allow_document_context: bool = True,
         allow_memory_context: bool = True,
     ):
@@ -176,6 +179,9 @@ class ChatOrchestrator:
                     history_models = explicit_history
                 else:
                     history_filters = [ChatMessage.user_id == user_id]
+                    recipient_device = context_recipient.removeprefix('device:') if context_recipient else None
+                    same_recipient = exists(select(ChatTurn.id).where(ChatTurn.id == ChatMessage.turn_id, ChatTurn.device_id == recipient_device))
+                    history_filters.append(or_(ChatMessage.role == "user", ChatMessage.turn_id.is_(None), same_recipient))
                     if history_after:
                         history_filters.append(ChatMessage.created_at > history_after)
                     # Prior assistant text can contain data fetched under wider
@@ -209,15 +215,20 @@ class ChatOrchestrator:
                 )
                 user_msg_obj = user_msg_res.scalar_one_or_none()
                 user_message_text = user_msg_obj.content if user_msg_obj else ""
+                file_response = (await file_delivery_response(session, user_id, user_message_text)
+                                 if allow_document_context else None)
                 memory_context = ''
-                if allow_memory_context:
+                if allow_memory_context and file_response is None:
+                    recall = await context_engine.past_conversation_context(session, user_id, user_message_text, after=history_after, exclude_turn=turn_id)
                     memory_context = await context_engine.memory_context(
                         session, user_id, query=user_message_text,
-                        as_of=datetime.now(timezone.utc),
+                        as_of=datetime.now(timezone.utc), token_budget=900 if recall else 1950,
                     )
-                if allow_document_context:
+                    if recall:
+                        memory_context += "\n" + recall
+                if allow_document_context and file_response is None:
                     passages = await document_retrieval.search(
-                        session, user_id, user_message_text,
+                        session, user_id, user_message_text, recipient_id=context_recipient,
                     )
                     document_context = format_document_context(passages)
                 else:
@@ -235,12 +246,18 @@ class ChatOrchestrator:
 
             # 3. Stream de inferencia local
             full_response = ""
-            async for chunk in stream_chat_completion(llm_messages):
-                full_response += chunk
-                await self._broadcast(turn_id, {"type": "token", "content": chunk})
+            if file_response is not None:
+                full_response = file_response
+                await self._broadcast(turn_id, {"type": "token", "content": file_response})
+            else:
+                async for chunk in stream_chat_completion(llm_messages):
+                    full_response += chunk
+                    await self._broadcast(turn_id, {"type": "token", "content": chunk})
 
             # 4. Extraer posibles propuestas estructuradas
             proposal, clean_text = extract_proposal_from_text(full_response)
+            if "```proposal" in full_response and (proposal is None or not proposal.resulting_items):
+                raise ValueError("No pude preparar un cambio válido. No se modificó la agenda; precisa el cambio e intenta de nuevo.")
             if proposal:
                 # The model sees local clock times. Attach their zone before
                 # persistence so confirming a proposal cannot shift it six hours.
@@ -336,33 +353,33 @@ class ChatOrchestrator:
         self, turn_id: str, user_id: str
     ) -> AsyncGenerator[str, None]:
         """Suscripción SSE a un turno. Si ya terminó, entrega el resultado inmediatamente."""
-        # 1. Inspeccionar estado actual en base de datos
-        async with get_db_context() as session:
-            turn_resp = await self.get_turn_response(session, user_id, turn_id)
-
-        if not turn_resp:
-            yield f"data: {json.dumps({'type': 'error', 'message': 'Turno no encontrado'})}\n\n"
-            return
-
-        # Si ya está completado, entregar el mensaje completo y cerrar
-        if turn_resp.status == "completed":
-            yield f"data: {json.dumps({'type': 'status', 'status': 'completed'})}\n\n"
-            if turn_resp.assistant_message:
-                yield f"data: {json.dumps({'type': 'token', 'content': turn_resp.assistant_message})}\n\n"
-            if turn_resp.proposal:
-                yield f"data: {json.dumps({'type': 'proposal', 'proposal': turn_resp.proposal.model_dump(mode='json')})}\n\n"
-            yield f"data: {json.dumps({'type': 'done', 'turn_id': turn_id, 'status': 'completed'})}\n\n"
-            return
-
-        if turn_resp.status == "failed":
-            yield f"data: {json.dumps({'type': 'error', 'message': turn_resp.error_message or 'Generación fallida'})}\n\n"
-            return
-
-        # 2. Suscribirse a la cola activa en memoria
+        # Register before the status query so a fast file response cannot finish
+        # between the snapshot and subscription. Ownership is checked before yield.
         q = asyncio.Queue()
         self._subscribers.setdefault(turn_id, []).append(q)
-
         try:
+            # 1. Inspeccionar estado actual en base de datos
+            async with get_db_context() as session:
+                turn_resp = await self.get_turn_response(session, user_id, turn_id)
+
+            if not turn_resp:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Turno no encontrado'})}\n\n"
+                return
+
+            # Si ya está completado, entregar el mensaje completo y cerrar
+            if turn_resp.status == "completed":
+                yield f"data: {json.dumps({'type': 'status', 'status': 'completed'})}\n\n"
+                if turn_resp.assistant_message:
+                    yield f"data: {json.dumps({'type': 'token', 'content': turn_resp.assistant_message})}\n\n"
+                if turn_resp.proposal:
+                    yield f"data: {json.dumps({'type': 'proposal', 'proposal': turn_resp.proposal.model_dump(mode='json')})}\n\n"
+                yield f"data: {json.dumps({'type': 'done', 'turn_id': turn_id, 'status': 'completed'})}\n\n"
+                return
+
+            if turn_resp.status == "failed":
+                yield f"data: {json.dumps({'type': 'error', 'message': turn_resp.error_message or 'Generación fallida'})}\n\n"
+                return
+
             # Emitir estado inicial
             yield f"data: {json.dumps({'type': 'status', 'status': turn_resp.status})}\n\n"
 

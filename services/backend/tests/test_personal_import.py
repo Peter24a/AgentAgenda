@@ -105,13 +105,13 @@ def test_exclusions_precede_open_and_private_originals_require_opt_in(tmp_path, 
     monkeypatch.setattr(personal, '_open_source', guarded_open)
     safe = personal.scan_archive([root])
     by_path = {entry['path']: entry for entry in safe['entries']}
-    assert by_path['identidad/passport.pdf']['action'] == 'review'
-    assert by_path['fiscal/statement.pdf']['action'] == 'review'
+    assert by_path['identidad/passport.pdf']['action'] == 'excluded'
+    assert by_path['fiscal/statement.pdf']['action'] == 'excluded'
     assert by_path['PersonalLLM/NEVER.md']['action'] == 'excluded'
     assert by_path['notes/LEEME.txt']['action'] == 'excluded'
     assert 'PersonalLLM/AGENTS.md' not in opened
     private = personal.scan_archive([root], include_opt_in=True)
-    assert all(entry['privacy'] == 'OPT_IN' for entry in private['entries']
+    assert all(entry['privacy'] == 'NEVER_UPLOAD' for entry in private['entries']
                if entry['path'] in {'identidad/passport.pdf', 'fiscal/statement.pdf'})
 
 

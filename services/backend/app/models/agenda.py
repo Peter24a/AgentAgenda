@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 class ActivityCategory(str, Enum):
@@ -14,6 +14,7 @@ class ActivityCategory(str, Enum):
 
 class AgendaItemModel(BaseModel):
     id: str
+    action: Literal["upsert", "delete"] = "upsert"
     title: str
     description: Optional[str] = None
     start_time: datetime

@@ -21,7 +21,7 @@ class FollowUpSettings {
     this.alarmWeekdays = const [1, 2, 3, 4, 5],
     this.quietHour = 22,
     this.quietMinute = 30,
-    this.dailyLimit = 4,
+    this.dailyLimit = 6,
   });
 
   FollowUpSettings copyWith({
@@ -75,9 +75,9 @@ class FollowUpSettings {
           : const [1, 2, 3, 4, 5],
       quietHour: bounded('quiet_hour', 22, 23),
       quietMinute: bounded('quiet_minute', 30, 59),
-      dailyLimit: const [2, 4, 6, 8].contains(json['daily_limit'])
+      dailyLimit: const [2, 3, 4, 6, 8].contains(json['daily_limit'])
           ? json['daily_limit'] as int
-          : 4,
+          : 6,
     );
   }
 }
@@ -87,11 +87,18 @@ class PlannedFollowUp {
   final String eventId;
   final DateTime eventStart;
   final DateTime at;
+  final String kind;
+  final String body;
+  final bool repeatsDaily;
   const PlannedFollowUp({
     required this.key,
     required this.eventId,
     required this.eventStart,
     required this.at,
+    this.kind = 'check_in',
+    this.body =
+        '¿Cómo va tu día? Cuéntame qué has hecho y qué quieres ajustar.',
+    this.repeatsDaily = false,
   });
 
   // Stable across process restarts; do not rely on Dart's hashCode.
@@ -103,7 +110,9 @@ class PlannedFollowUp {
     return value == 0 ? 1 : value;
   }
 
-  String get signature => '$key|${at.toUtc().toIso8601String()}';
+  String get signature => repeatsDaily
+      ? '$key|$body|daily'
+      : '$key|${at.toUtc().toIso8601String()}|$body';
 }
 
 bool inQuietHours(DateTime instant, FollowUpSettings settings) {
@@ -121,75 +130,104 @@ List<PlannedFollowUp> planFollowUps(
   DateTime now,
 ) {
   if (!settings.enabled) return [];
+  final zone = tz.getLocation(agendaTimezone);
+  final localNow = tz.TZDateTime.from(now, zone);
   final sleep = events
       .where((e) => !e.isProvisional && e.category == ActivityCategory.sleep)
       .toList();
-  final candidates = <PlannedFollowUp>[];
-  final seen = <String>{};
-  final limit = now.add(const Duration(days: 7));
+  final result = <PlannedFollowUp>[];
+  final seen = <int>{};
+  void add(PlannedFollowUp value) {
+    if (seen.add(value.notificationId)) result.add(value);
+  }
+
+  // Recurring local prompts continue while the app is closed, without a server
+  // push token or an obligation to mark calendar activities as complete.
+  var count = 0;
+  for (
+    var minute = 9 * 60;
+    minute <= 21 * 60 + 30 && count < settings.dailyLimit;
+    minute += 150
+  ) {
+    var at = tz.TZDateTime(
+      zone,
+      localNow.year,
+      localNow.month,
+      localNow.day,
+      minute ~/ 60,
+      minute % 60,
+    );
+    if (!at.isAfter(now.add(const Duration(minutes: 1)))) {
+      at = tz.TZDateTime(
+        zone,
+        at.year,
+        at.month,
+        at.day + 1,
+        at.hour,
+        at.minute,
+      );
+    }
+    if (inQuietHours(at, settings) ||
+        minute > settings.quietHour * 60 + settings.quietMinute - 45) {
+      continue;
+    }
+    // A recurring time must not conflict with any known sleep window.
+    final conflicts = sleep.any((event) {
+      final start = tz.TZDateTime.from(event.startTime, zone);
+      final end = tz.TZDateTime.from(agendaEventEnd(event), zone);
+      final from = start.hour * 60 + start.minute - 30;
+      final to = end.hour * 60 + end.minute;
+      return end.difference(start).inHours >= 24 ||
+          (to <= from
+              ? minute >= from || minute < to
+              : minute >= from && minute < to);
+    });
+    if (conflicts) continue;
+    add(
+      PlannedFollowUp(
+        key: 'daily-check-in-$minute',
+        eventId: '',
+        eventStart: at,
+        at: at,
+        repeatsDaily: true,
+        body: minute >= 20 * 60
+            ? 'Cuéntame cómo estuvo tu día y qué te gustaría retomar mañana.'
+            : '¿Cómo va tu día? Cuéntame qué has hecho o si cambió el plan.',
+      ),
+    );
+    count++;
+  }
   for (final event in events) {
-    if (event.isCompleted ||
-        event.isProvisional ||
-        event.category == ActivityCategory.sleep) {
+    if (event.isProvisional || event.category == ActivityCategory.sleep) {
       continue;
     }
-    final end = agendaEventEnd(event);
-    final duration = end.difference(event.startTime);
-    if (duration.inMinutes < 20) continue;
-    // One prompt at the end of short blocks, 15 minutes before long blocks end.
-    final at = duration.inMinutes >= 90
-        ? end.subtract(const Duration(minutes: 15))
-        : end;
+    final at = event.startTime.subtract(const Duration(minutes: 10));
     if (!at.isAfter(now.add(const Duration(minutes: 1))) ||
-        !at.isBefore(limit)) {
-      continue;
-    }
-    if (inQuietHours(at, settings)) continue;
-    // Leave a margin before bedtime for inexact Android delivery.
-    final local = tz.TZDateTime.from(at, tz.getLocation(agendaTimezone));
-    if (local.hour * 60 + local.minute >
-        settings.quietHour * 60 + settings.quietMinute - 45) {
+        !at.isBefore(now.add(const Duration(days: 7))) ||
+        inQuietHours(at, settings)) {
       continue;
     }
     if (sleep.any(
-      (s) =>
-          !at.isBefore(s.startTime.subtract(const Duration(minutes: 30))) &&
-          at.isBefore(agendaEventEnd(s)),
+      (e) =>
+          !at.isBefore(e.startTime.subtract(const Duration(minutes: 30))) &&
+          at.isBefore(agendaEventEnd(e)),
     )) {
       continue;
     }
-    final key =
-        'followup|${event.id}|${event.startTime.toUtc().toIso8601String()}';
-    if (seen.add(key)) {
-      candidates.add(
-        PlannedFollowUp(
-          key: key,
-          eventId: event.id,
-          eventStart: event.startTime,
-          at: at,
-        ),
-      );
-    }
-  }
-  candidates.sort((a, b) => a.at.compareTo(b.at));
-  final result = <PlannedFollowUp>[];
-  final dailyCounts = <String, int>{};
-  final usedIds = <int>{};
-  for (final followUp in candidates) {
-    final date = tz.TZDateTime.from(
-      followUp.at,
-      tz.getLocation(agendaTimezone),
+    add(
+      PlannedFollowUp(
+        key:
+            'reminder|${event.id}|${event.startTime.toUtc().toIso8601String()}',
+        eventId: event.id,
+        eventStart: event.startTime,
+        at: at,
+        kind: 'reminder',
+        body: event.title.isEmpty
+            ? 'Tienes una actividad en unos 10 minutos.'
+            : 'En unos 10 minutos: ${event.title}',
+      ),
     );
-    final day = '${date.year}-${date.month}-${date.day}';
-    if ((dailyCounts[day] ?? 0) >= settings.dailyLimit) continue;
-    if (result.isNotEmpty &&
-        followUp.at.difference(result.last.at).inMinutes < 75) {
-      continue;
-    }
-    // In the unlikely event of an ID collision, never overwrite another notice.
-    if (!usedIds.add(followUp.notificationId)) continue;
-    result.add(followUp);
-    dailyCounts[day] = (dailyCounts[day] ?? 0) + 1;
   }
+  result.sort((a, b) => a.at.compareTo(b.at));
   return result;
 }

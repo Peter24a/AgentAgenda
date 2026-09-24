@@ -17,8 +17,8 @@ def llm_headers() -> dict[str, str]:
 
 async def stream_chat_completion(
     messages: List[Dict[str, str]],
-    temperature: float = 0.7,
-    max_tokens: int = 1024,
+    temperature: float = 0.3,
+    max_tokens: int = 2048,
 ) -> AsyncGenerator[str, None]:
     payload = {
         "model": settings.llm_model,
@@ -52,6 +52,8 @@ async def stream_chat_completion(
                         if not isinstance(event, dict) or "error" in event:
                             raise LLMError("El servicio de IA devolvió un error durante la generación.")
                         for choice in event.get("choices", []):
+                            if choice.get("finish_reason") == "length":
+                                raise LLMError("La respuesta excedió el límite; pide un cambio más breve antes de aprobarlo.")
                             content = choice.get("delta", {}).get("content")
                             if content:
                                 if not isinstance(content, str):

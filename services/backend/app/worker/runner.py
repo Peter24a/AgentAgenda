@@ -10,6 +10,7 @@ from app.config import settings
 from app.db.session import engine, get_db_context
 from app.models.canonical import Job
 from app.worker.worker import background_worker
+from app.services.weekly_routines import maintain_weekly_routines
 
 logger = logging.getLogger(__name__)
 LEASE_TIMEOUT = timedelta(minutes=30)
@@ -35,6 +36,15 @@ async def heartbeat():
         await asyncio.sleep(5)
 
 
+async def routine_maintenance():
+    while True:
+        try:
+            await maintain_weekly_routines()
+        except Exception:
+            logger.exception("Weekly routine maintenance failed")
+        await asyncio.sleep(300)
+
+
 async def run():
     # Session-level advisory lock permits exactly one worker runner on PostgreSQL.
     async with engine.connect() as leader:
@@ -43,6 +53,7 @@ async def run():
             if not acquired:
                 raise RuntimeError('Another worker runner is already active')
         pulse = asyncio.create_task(heartbeat())
+        routines = asyncio.create_task(routine_maintenance())
         try:
             while True:
                 processed = 0
@@ -56,7 +67,8 @@ async def run():
                 await asyncio.sleep(0.1 if processed else 2)
         finally:
             pulse.cancel()
-            await asyncio.gather(pulse, return_exceptions=True)
+            routines.cancel()
+            await asyncio.gather(pulse, routines, return_exceptions=True)
             (Path(settings.storage_path)/'worker-heartbeat.json').unlink(missing_ok=True)
             if engine.dialect.name == 'postgresql':
                 await leader.execute(text('SELECT pg_advisory_unlock(437610241)'))

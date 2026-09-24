@@ -209,3 +209,15 @@ PYTHONPATH=/home/peterpad/Documents/AgentAgenda/services/backend DATABASE_URL=sq
 ```
 
 La documentación histórica describe estados anteriores. Este archivo es el punto de continuación de **esta revisión**, y debe actualizarse con resultados observados al completar cada fase, sin marcar realizado lo que solo se preparó localmente.
+
+## Reanudación — 2026-09-21
+
+Fuente: petición explícita de Pedro y validación técnica. La pausa anterior termina para esta revisión. Se implementaron archivos bidireccionales en Android/chat y mejoras de propuestas de calendario; ver [revisión, pruebas y límites](docs/operations/2026-09-21-files-calendar.md). Esta entrega no marca cerrado el resto del plan ni implica que se haya retirado PersonalLLM.
+
+## Actualización adicional — 21 de septiembre de 2026, noche
+
+Por petición actual de Pedro: SARA 1.2.0+3 incorpora historial de 12 horas con carga anterior, conversaciones cada 2½ horas y recordatorios sin marcar completado. Importación PersonalLLM y memoria por recuperación ampliadas; despliegue y permisos del Pixel comprobados. Evidencia, recuperación y límites: [informe de contexto y chat](docs/operations/2026-09-22-context-chat.md). No se considera resuelto el push del servidor ni el entrenamiento automático del modelo.
+
+## Recuperación recurrente — 21 de septiembre de 2026, noche
+
+Pedro confirmó «Como rutina semanal» después de detectar la semana vacía. Corregida la falta de repetición: plantilla persistente, mantenimiento de próximas cuatro semanas y conservación de ediciones/cancelaciones. SARA 1.2.1+4; detalles y pruebas en [recuperación semanal](docs/operations/2026-09-22-weekly-routine.md). Las casillas históricas de horario pendiente de las secciones anteriores ya no describen este despliegue; se conservan como historial.

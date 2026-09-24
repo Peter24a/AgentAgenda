@@ -63,7 +63,10 @@ class _AgendaScreenState extends State<AgendaScreen>
   void _openNotificationCheckIn() {
     if (!mounted || !FollowUpService.instance.openCheckIn.value) return;
     FollowUpService.instance.openCheckIn.value = false;
-    _openAgentChat(checkIn: true);
+    _openAgentChat(
+      checkIn: true,
+      notification: FollowUpService.instance.openedNotification,
+    );
   }
 
   @override
@@ -168,39 +171,16 @@ class _AgendaScreenState extends State<AgendaScreen>
     );
   }
 
-  Future<void> _toggleItem(AgendaItem item) async {
-    if (!_pendingChanges.add(item.id)) return;
-    setState(
-      () => _items = _items
-          .map(
-            (it) => it.id == item.id
-                ? it.copyWith(isCompleted: !it.isCompleted)
-                : it,
-          )
-          .toList(),
-    );
-    final success = await ApiClient.instance.toggleEvent(
-      item.id,
-      date: item.startTime,
-    );
-    _pendingChanges.remove(item.id);
-    if (!mounted) return;
-    if (!success) {
-      setState(
-        () =>
-            _items = _items.map((it) => it.id == item.id ? item : it).toList(),
-      );
-      _showMessage('No se pudo guardar el cambio de actividad.');
-    } else {
-      if (!item.isCompleted) {
-        await FollowUpService.instance.removeEvent(
-          item.id,
-          occurrence: item.startTime,
-        );
-      }
-      unawaited(FollowUpService.instance.synchronize());
-    }
-  }
+  Future<void> _discussItem(AgendaItem item) => _openAgentChat(
+    checkIn: true,
+    notification: {
+      'notification_key':
+          'discuss-${item.id}-${DateTime.now().microsecondsSinceEpoch}',
+      'event_id': item.id,
+      'kind': 'check_in',
+      'scheduled_at': DateTime.now().toUtc().toIso8601String(),
+    },
+  );
 
   Future<void> _deleteItem(AgendaItem item) async {
     if (!_pendingChanges.add(item.id)) return;
@@ -274,19 +254,11 @@ class _AgendaScreenState extends State<AgendaScreen>
                 const SizedBox(height: 18),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    item.isCompleted
-                        ? Icons.remove_done_rounded
-                        : Icons.check_circle_outline_rounded,
-                  ),
-                  title: Text(
-                    item.isCompleted
-                        ? 'Marcar como pendiente'
-                        : 'Marcar como completada',
-                  ),
+                  leading: const Icon(Icons.chat_bubble_outline),
+                  title: const Text('Platicar cómo me fue'),
                   onTap: () {
                     Navigator.pop(ctx);
-                    _toggleItem(item);
+                    _discussItem(item);
                   },
                 ),
                 ListTile(
@@ -337,12 +309,16 @@ class _AgendaScreenState extends State<AgendaScreen>
     }
   }
 
-  Future<void> _openAgentChat({bool checkIn = false}) async {
+  Future<void> _openAgentChat({
+    bool checkIn = false,
+    Map<String, dynamic>? notification,
+  }) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ChatScreen(
           agendaDate: _selectedDate,
           checkIn: checkIn,
+          notification: notification,
           initialPrompt: checkIn
               ? '¿Qué estás haciendo ahora? Cuéntame cómo vas y elegimos el siguiente paso.'
               : null,
@@ -362,7 +338,6 @@ class _AgendaScreenState extends State<AgendaScreen>
         agendaSameDay(_selectedDate, _now) &&
         !dayItems.any(
           (item) =>
-              !item.isCompleted &&
               !item.startTime.isAfter(_now) &&
               agendaEventEnd(item).isAfter(_now),
         );
@@ -390,9 +365,6 @@ class _AgendaScreenState extends State<AgendaScreen>
                     selectedDate: _selectedDate,
                     view: _view,
                     totalActivities: displayedItems.length,
-                    completedActivities: displayedItems
-                        .where((item) => item.isCompleted)
-                        .length,
                     onViewChanged: (view) => _select(
                       _selectedDate,
                       view,
@@ -464,7 +436,7 @@ class _AgendaScreenState extends State<AgendaScreen>
                       showCheckIn: showCheckIn,
                       onCheckIn: () => _openAgentChat(checkIn: true),
                       onOpenItem: _showItemOptions,
-                      onToggleItem: _toggleItem,
+                      onDiscussItem: _discussItem,
                     ),
                   ),
                 if (_view == AgendaView.day &&

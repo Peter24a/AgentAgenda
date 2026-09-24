@@ -53,3 +53,18 @@ class ChatTurnResponse(BaseModel):
     error_message: Optional[str] = None
     created_at: datetime
     completed_at: Optional[datetime] = None
+
+
+class ChatWindowResponse(BaseModel):
+    messages: List[ChatMessageResponse]
+    window_start: datetime
+    window_end: datetime
+    next_cursor: Optional[str] = None
+    has_older: bool = False
+
+
+class CheckInRequest(BaseModel):
+    notification_key: str = Field(..., min_length=1, max_length=160)
+    event_id: Optional[str] = Field(None, max_length=64)
+    scheduled_at: Optional[datetime] = None
+    kind: Literal["check_in", "reminder"] = "check_in"

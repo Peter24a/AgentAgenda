@@ -47,3 +47,9 @@ async def test_connection_error_is_safe():
         raise httpx.ConnectError('sensitive details', request=request)
     with pytest.raises(llm_service.LLMError, match='servicio local'):
         await collect(handler)
+
+@pytest.mark.asyncio
+async def test_truncated_proposal_is_not_a_success():
+    body = 'data: {"choices":[{"delta":{"content":"```proposal {"}}]}\n\ndata: {"choices":[{"delta":{},"finish_reason":"length"}]}\n\ndata: [DONE]\n\n'
+    with pytest.raises(llm_service.LLMError, match='excedió'):
+        await collect(lambda request: httpx.Response(200, text=body))

@@ -143,7 +143,7 @@ def _fingerprint(collection, prepared):
 
 
 @asynccontextmanager
-async def _schedule_transaction(user_id, dry_run):
+async def _schedule_transaction(user_id, dry_run, *, persist_metadata=False):
     async with get_db_context() as session:
         dialect = session.bind.dialect.name
         sqlite_lock = _SQLITE_LOCKS.setdefault(session.bind, asyncio.Lock()) if dialect == 'sqlite' else None
@@ -179,7 +179,7 @@ async def _schedule_transaction(user_id, dry_run):
                     existing_stmt = existing_stmt.with_for_update()
                 existing = list((await session.execute(existing_stmt)).scalars().all())
                 yield session, head, existing, now
-                if dry_run or head.current_seq == initial_seq:
+                if dry_run or (head.current_seq == initial_seq and not persist_metadata):
                     # Previews and no-ops do not even persist an empty sync head.
                     await session.rollback()
                 else:

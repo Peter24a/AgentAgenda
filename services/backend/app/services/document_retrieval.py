@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, noload
 
 from app.models.canonical import Document, DocumentOrigin, DocumentRevision
-from app.services.context_visibility import safe_document_filters
+from app.services.context_visibility import safe_document_filters, document_context_filters
 
 
 # The deployed model supports extended context (up to 32768 tokens unified).
@@ -202,6 +202,7 @@ class DocumentRetrievalService:
         query: str,
         *,
         limit: int = 5,
+        recipient_id: Optional[str] = None,
     ) -> list[DocumentPassage]:
         query_weights = _query_weights(query)
         query_terms = set(query_weights)
@@ -226,7 +227,7 @@ class DocumentRetrievalService:
             .join(DocumentRevision, DocumentRevision.document_id == Document.id)
             .outerjoin(DocumentOrigin, DocumentOrigin.document_id == Document.id)
             .where(
-                *safe_document_filters(user_id),
+                *document_context_filters(user_id, recipient_id),
                 DocumentRevision.id == latest_id,
                 DocumentRevision.extraction_status.in_(("ready", "needs_review")),
                 DocumentRevision.extracted_text.is_not(None),
@@ -466,7 +467,9 @@ def source_reference_appendix(context: str) -> str:
             details.append(f"fecha de fuente {label(record['fecha_fuente'], 64)}")
         if record.get("extraccion_incompleta"):
             details.append("extracción incompleta")
-        lines.append(f"- [{record['referencia']}] {name}; {', '.join(details)}.")
+        from urllib.parse import quote
+        url = f"/v1/documents/{quote(str(record['documento_id']), safe='')}/versions/{int(record['version'])}/download"
+        lines.append(f"- [{record['referencia']}] {name}; {', '.join(details)}. [Abrir archivo]({url})")
     return "\n".join(lines)
 
 

@@ -79,7 +79,11 @@ async def confirm_proposal(
     # 1. Si existe en la base canónica, aplicar con transacción atómica estricta
     canonical_prop = await proposal_service.get_proposal(session, user_id, proposal_id)
     if canonical_prop:
-        return await proposal_service.confirm_proposal(session, user_id, proposal_id)
+        try:
+            return await proposal_service.confirm_proposal(session, user_id, proposal_id)
+        except ValueError as exc:
+            await session.rollback()
+            raise HTTPException(status_code=409, detail=str(exc))
 
     raise HTTPException(status_code=404, detail="Propuesta no encontrada")
 

@@ -62,6 +62,7 @@ enum ActivityCategory {
 /// Modelo de un elemento de la agenda.
 class AgendaItem {
   final String id;
+  final bool isCancellation;
   final String title;
   final String? description;
   final DateTime startTime;
@@ -72,6 +73,7 @@ class AgendaItem {
 
   const AgendaItem({
     required this.id,
+    this.isCancellation = false,
     required this.title,
     this.description,
     required this.startTime,
@@ -102,6 +104,7 @@ class AgendaItem {
   }) {
     return AgendaItem(
       id: id ?? this.id,
+      isCancellation: isCancellation,
       title: title ?? this.title,
       description: description ?? this.description,
       startTime: startTime ?? this.startTime,
@@ -121,6 +124,7 @@ class AgendaItem {
 
     return AgendaItem(
       id: json['id'] as String,
+      isCancellation: json['action'] == 'delete',
       title: json['title'] as String,
       description: json['description'] as String?,
       startTime: DateTime.parse(json['start_time'] as String).toLocal(),

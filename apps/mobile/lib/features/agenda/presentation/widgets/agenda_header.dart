@@ -9,7 +9,6 @@ class AgendaHeader extends StatelessWidget {
   final DateTime selectedDate;
   final AgendaView view;
   final int totalActivities;
-  final int completedActivities;
   final ValueChanged<AgendaView> onViewChanged;
   final VoidCallback onPrevious;
   final VoidCallback onNext;
@@ -21,7 +20,6 @@ class AgendaHeader extends StatelessWidget {
     required this.selectedDate,
     required this.view,
     required this.totalActivities,
-    required this.completedActivities,
     required this.onViewChanged,
     required this.onPrevious,
     required this.onNext,
@@ -45,9 +43,7 @@ class AgendaHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final title = _periodTitle;
-    final progress = totalActivities == 0
-        ? 0.0
-        : completedActivities / totalActivities;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
       child: Column(
@@ -187,23 +183,7 @@ class AgendaHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              Text(
-                '$completedActivities completadas',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: theme.colorScheme.primary,
-                ),
-              ),
             ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 4,
-              backgroundColor: theme.colorScheme.surfaceContainerHighest,
-              semanticsLabel: 'Progreso de actividades',
-            ),
           ),
         ],
       ),

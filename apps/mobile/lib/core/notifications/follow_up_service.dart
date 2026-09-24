@@ -33,7 +33,7 @@ class AndroidLocalNotificationDriver implements LocalNotificationDriver {
       'agenda_follow_up_v1',
       'Seguimientos de agenda',
       channelDescription:
-          'Preguntas breves al terminar o acercarte al final de una actividad.',
+          'Conversaciones durante el día y recordatorios de tus actividades.',
       importance: Importance.defaultImportance,
       priority: Priority.defaultPriority,
       visibility: NotificationVisibility.private,
@@ -78,11 +78,22 @@ class AndroidLocalNotificationDriver implements LocalNotificationDriver {
       reminder.at,
       tz.getLocation(agendaTimezone),
     ),
-    title: '¿Cómo vas?',
-    body: 'Puedes registrar lo que estás haciendo y elegir el siguiente paso.',
+    title: reminder.kind == 'reminder'
+        ? 'SARA · Recordatorio'
+        : 'SARA · ¿Cómo vas?',
+    body: reminder.body,
     notificationDetails: details,
     androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-    payload: jsonEncode({'kind': 'follow_up', 'event_id': reminder.eventId}),
+    matchDateTimeComponents: reminder.repeatsDaily
+        ? DateTimeComponents.time
+        : null,
+    payload: jsonEncode({
+      'kind': reminder.kind,
+      'event_id': reminder.eventId.isEmpty ? null : reminder.eventId,
+      'notification_key': reminder.key,
+      'scheduled_at': reminder.at.toUtc().toIso8601String(),
+      'repeats_daily': reminder.repeatsDaily,
+    }),
   );
   @override
   Future<void> test() => _plugin.show(
@@ -110,6 +121,7 @@ class FollowUpService extends ChangeNotifier {
   final FollowUpLoader _loader;
   final DateTime Function() _now;
   final bool supported;
+  Map<String, dynamic>? openedNotification;
   final ValueNotifier<bool> openCheckIn = ValueNotifier(false);
   FollowUpSettings settings = const FollowUpSettings();
   DateTime? lastSynced;
@@ -168,7 +180,23 @@ class FollowUpService extends ChangeNotifier {
       await _driver.initialize((payload) {
         if (payload == null) return;
         try {
-          if ((jsonDecode(payload) as Map)['kind'] == 'follow_up') {
+          final value = Map<String, dynamic>.from(jsonDecode(payload) as Map);
+          if (['check_in', 'reminder', 'follow_up'].contains(value['kind'])) {
+            final now = tz.TZDateTime.from(
+              _now(),
+              tz.getLocation(agendaTimezone),
+            );
+            openedNotification = {
+              'kind': value['kind'] == 'reminder' ? 'reminder' : 'check_in',
+              'event_id': value['event_id'],
+              'notification_key': value['repeats_daily'] == true
+                  ? '${value['notification_key']}-${now.year}-${now.month}-${now.day}'
+                  : value['notification_key'] ??
+                        'legacy-${now.microsecondsSinceEpoch}',
+              'scheduled_at': value['repeats_daily'] == true
+                  ? _now().toUtc().toIso8601String()
+                  : value['scheduled_at'],
+            };
             openCheckIn.value = true;
           }
         } catch (_) {
@@ -268,7 +296,7 @@ class FollowUpService extends ChangeNotifier {
               .map(
                 (event) => {
                   'id': event.id,
-                  'title': '',
+                  'title': event.title,
                   'start_time': event.startTime.toUtc().toIso8601String(),
                   'end_time': event.endTime?.toUtc().toIso8601String(),
                   'category': event.category.name,
@@ -285,8 +313,8 @@ class FollowUpService extends ChangeNotifier {
     permissionGranted = await _driver.allowed();
     final freshEnough =
         lastSynced != null && _now().difference(lastSynced!).inDays < 7;
-    final next = permissionGranted && freshEnough
-        ? planFollowUps(_cache, settings, _now())
+    final next = permissionGranted
+        ? planFollowUps(freshEnough ? _cache : [], settings, _now())
         : <PlannedFollowUp>[];
     final nextIds = next.map((n) => n.notificationId).toSet();
     final pending = await _driver.pendingIds();

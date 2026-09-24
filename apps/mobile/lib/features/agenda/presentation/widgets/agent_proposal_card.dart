@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
 import '../../models/agent_proposal.dart';
 
 /// Tarjeta que visualiza una propuesta generada por el Asistente SARA.
@@ -28,10 +30,7 @@ class AgentProposalCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: colorScheme.outlineVariant,
-            width: 1.0,
-          ),
+          border: Border.all(color: colorScheme.outlineVariant, width: 1.0),
         ),
         clipBehavior: Clip.antiAlias,
         child: Stack(
@@ -114,6 +113,14 @@ class AgentProposalCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
+                  for (final item in proposal.resultingItems)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Text(
+                        '${item.isCancellation ? "Cancelar: " : ""}${item.title}\n${DateFormat("dd/MM/yyyy HH:mm").format(item.startTime)}${item.endTime == null ? '' : ' → ${DateFormat("dd/MM/yyyy HH:mm").format(item.endTime!)}'}',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ),
                   // Botones de acción del usuario (Aprobar / Descartar)
                   Row(
                     children: [

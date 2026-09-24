@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../../../../core/notifications/follow_up_plan.dart';
+import '../../../../../core/network/api_client.dart';
 import '../../../../../core/notifications/follow_up_service.dart';
 import '../../../../../core/notifications/system_clock.dart';
 
@@ -19,11 +20,45 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   late final FollowUpService service =
       widget.service ?? FollowUpService.instance;
   bool _clockBusy = false;
+  bool _routineBusy = false;
+  List<Map<String, dynamic>> _routines = [];
+  bool _routineError = false;
+
+  Future<void> _loadRoutines() async {
+    try {
+      final rows = await ApiClient.instance.getWeeklyRoutines();
+      if (mounted) {
+        setState(() {
+          _routines = rows;
+          _routineError = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _routineError = true);
+    }
+  }
+
+  Future<void> _toggleRoutine(String id, bool enabled) async {
+    setState(() => _routineBusy = true);
+    try {
+      await ApiClient.instance.setWeeklyRoutineEnabled(id, enabled);
+      await _loadRoutines();
+      await service.synchronize();
+    } catch (_) {
+      _message(
+        'No se pudo cambiar la repetición. Reintenta cuando tengas conexión.',
+      );
+    } finally {
+      if (mounted) setState(() => _routineBusy = false);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     service.init();
+    _loadRoutines();
   }
 
   @override
@@ -111,12 +146,47 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   'Estos ajustes requieren Android. No se programarán avisos desde esta plataforma.',
                 ),
               if (service.busy) const LinearProgressIndicator(),
+              if (_routines.isNotEmpty || _routineError)
+                _Section(
+                  title: 'Rutina semanal',
+                  icon: Icons.repeat_rounded,
+                  children: [
+                    const Text(
+                      'Mantiene las próximas cuatro semanas en el calendario. Los cambios o cancelaciones de una actividad concreta se conservan. Al desactivar, deja de agregar semanas nuevas y conserva las actividades ya cargadas.',
+                    ),
+                    if (_routineBusy) const LinearProgressIndicator(),
+                    if (_routineError)
+                      TextButton(
+                        onPressed: _loadRoutines,
+                        child: const Text(
+                          'No se pudo consultar la rutina. Reintentar',
+                        ),
+                      ),
+                    for (final routine in _routines)
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(routine['name'] as String),
+                        subtitle: Text(
+                          routine['enabled'] == true
+                              ? 'Repetición semanal activa'
+                              : 'No se agregarán nuevas semanas',
+                        ),
+                        value: routine['enabled'] == true,
+                        onChanged: _routineBusy
+                            ? null
+                            : (value) => _toggleRoutine(
+                                routine['id'] as String,
+                                value,
+                              ),
+                      ),
+                  ],
+                ),
               _Section(
-                title: 'Seguimientos variables',
+                title: 'Conversaciones y recordatorios',
                 icon: Icons.notifications_active_outlined,
                 children: [
                   const Text(
-                    'Una pregunta breve al finalizar bloques de 20 a 89 minutos, o 15 minutos antes del final de bloques más largos. No son avisos a intervalos fijos.',
+                    'SARA te pregunta cómo vas cada 2½ horas durante el día y te recuerda tus actividades 10 minutos antes. Puedes contarle cómo te fue sin marcar casillas.',
                   ),
                   SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
@@ -184,10 +254,10 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   DropdownButtonFormField<int>(
                     initialValue: settings.dailyLimit,
                     decoration: const InputDecoration(
-                      labelText: 'Máximo de avisos planificados por día',
+                      labelText: 'Máximo de conversaciones por día',
                       border: OutlineInputBorder(),
                     ),
-                    items: [2, 4, 6, 8]
+                    items: [2, 3, 4, 6, 8]
                         .map(
                           (number) => DropdownMenuItem(
                             value: number,
@@ -207,7 +277,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   ),
                   const SizedBox(height: 14),
                   const Text(
-                    'Se separan al menos 75 minutos. Se omiten actividades completadas, de sueño y propuestas o bloques provisionales/condicionales sin aceptar.',
+                    'SARA te invita a conversar cada 2–3 horas. Los recordatorios de actividades se programan por separado. Se respetan el descanso y los bloques provisionales.',
                   ),
                   const SizedBox(height: 8),
                   ListTile(
@@ -239,7 +309,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${service.planned.length} avisos pendientes para los próximos siete días.',
+                    '${service.planned.length} avisos programados, incluidas las conversaciones que se repiten cada día.',
                   ),
                   if (service.error != null)
                     Padding(
@@ -280,8 +350,10 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                                   ),
                                 ),
                               ),
-                              subtitle: const Text(
-                                'Seguimiento de una actividad · hora aproximada',
+                              subtitle: Text(
+                                notice.repeatsDaily
+                                    ? 'Conversación diaria · hora aproximada'
+                                    : 'Recordatorio · hora aproximada',
                               ),
                             ),
                           )

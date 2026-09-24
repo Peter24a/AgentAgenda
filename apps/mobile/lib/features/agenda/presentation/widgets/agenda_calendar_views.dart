@@ -97,9 +97,7 @@ class AgendaWeekView extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
-                                  decoration: item.isCompleted
-                                      ? TextDecoration.lineThrough
-                                      : null,
+                                  decoration: null,
                                 ),
                               ),
                             ),
@@ -210,10 +208,7 @@ class AgendaMonthView extends StatelessWidget {
         color: theme.colorScheme.surfaceContainerLow,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: theme.colorScheme.outlineVariant,
-            width: 1.0,
-          ),
+          side: BorderSide(color: theme.colorScheme.outlineVariant, width: 1.0),
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(

@@ -204,3 +204,25 @@ async def toggle_task_completed(
         "status": updated.status,
         "version": updated.version,
     }
+
+
+class RoutineEnabledRequest(BaseModel):
+    enabled: bool
+
+
+@router.get('/routines')
+async def list_routines(session: AsyncSession = Depends(get_db_session), auth: AuthContext = Depends(require_scope('agenda:read'))):
+    from sqlalchemy import select
+    from app.models.canonical import WeeklyRoutine
+    rows = (await session.scalars(select(WeeklyRoutine).where(WeeklyRoutine.user_id == auth.user_id))).all()
+    return [{'id': r.id, 'name': r.name, 'enabled': r.enabled, 'timezone': r.timezone,
+             'materialized_through': r.materialized_through} for r in rows]
+
+
+@router.put('/routines/{routine_id}/enabled')
+async def enable_routine(routine_id: str, req: RoutineEnabledRequest, auth: AuthContext = Depends(require_scope('agenda:write'))):
+    from app.services.weekly_routines import set_routine_enabled
+    result = await set_routine_enabled(routine_id, auth.user_id, req.enabled)
+    if result is None:
+        raise HTTPException(404, 'Rutina no encontrada')
+    return result

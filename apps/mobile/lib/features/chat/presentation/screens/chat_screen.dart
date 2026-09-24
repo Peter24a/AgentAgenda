@@ -1,18 +1,25 @@
+import 'dart:convert';
+
+import 'package:intl/intl.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../documents/document_library.dart';
 import '../../../agenda/models/agent_proposal.dart';
 import '../../../agenda/presentation/widgets/agent_proposal_card.dart';
 
 /// Mensaje en la conversación del asistente.
 class ChatMessage {
+  final String? id;
   String text;
   final bool isUser;
   final DateTime timestamp;
   AgentProposal? proposal;
 
   ChatMessage({
+    this.id,
     required this.text,
     required this.isUser,
     required this.timestamp,
@@ -25,11 +32,13 @@ class ChatScreen extends StatefulWidget {
   final String? initialPrompt;
   final bool checkIn;
   final DateTime? agendaDate;
+  final Map<String, dynamic>? notification;
   const ChatScreen({
     super.key,
     this.initialPrompt,
     this.checkIn = false,
     this.agendaDate,
+    this.notification,
   });
 
   @override
@@ -40,6 +49,15 @@ class _ChatScreenState extends State<ChatScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   bool _isGenerating = false;
+  bool _uploading = false;
+  double _uploadProgress = 0;
+  bool _historyLoading = true;
+  bool _olderLoading = false;
+  bool _hasOlder = false;
+  DateTime? _windowEnd;
+  DateTime? _windowStart;
+  String? _olderCursor;
+  String? _historyError;
   late bool _checkInPending;
   DateTime? _checkInObservedAt;
   String? _checkInActivity;
@@ -59,58 +77,126 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!widget.checkIn && widget.initialPrompt != null) {
       _controller.text = widget.initialPrompt!;
     }
+    _scrollController.addListener(_onHistoryScroll);
     _loadHistory();
   }
 
-  Future<void> _loadHistory() async {
+  ChatMessage _fromHistory(Map<String, dynamic> m) {
+    final raw = m['created_at'] as String;
+    final instant = DateTime.parse(
+      RegExp(r'(Z|[+-]\d\d:\d\d)$').hasMatch(raw) ? raw : '${raw}Z',
+    );
+    return ChatMessage(
+      id: m['id'] as String?,
+      text: m['content'] as String,
+      isUser: m['role'] == 'user',
+      timestamp: instant.toLocal(),
+    );
+  }
+
+  void _onHistoryScroll() {
+    if (_scrollController.hasClients &&
+        _scrollController.position.isScrollingNotifier.value &&
+        _scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 120 &&
+        !_historyLoading &&
+        !_olderLoading &&
+        _hasOlder &&
+        _historyError == null) {
+      _loadOlder();
+    }
+  }
+
+  Future<void> _loadOlder() async {
+    if (_olderLoading || !_hasOlder) return;
+    setState(() {
+      _olderLoading = true;
+      _historyError = null;
+    });
     try {
-      final messages = await ApiClient.instance.getChatMessages(limit: 50);
-      if (messages.isNotEmpty && mounted) {
-        setState(() {
-          _messages.clear();
-          for (final m in messages) {
-            final text = m['content'] as String? ?? m['text'] as String? ?? '';
-            final role = m['role'] as String?;
-            final isUser = role == 'user' || m['is_user'] == true;
-            if (text.isNotEmpty) {
-              _messages.add(
-                ChatMessage(
-                  text: text,
-                  isUser: isUser,
-                  timestamp: m['created_at'] != null
-                      ? DateTime.parse(m['created_at'] as String)
-                      : DateTime.now(),
-                ),
-              );
-            }
-          }
-          if (_messages.isEmpty) {
-            _messages.add(
-              ChatMessage(
-                text: '¡Hola! Soy tu asistente de agenda. Puedo ayudarte a reorganizar tus horas, resolver conflictos o planear tu día.',
-                isUser: false,
-                timestamp: DateTime.now(),
-              ),
-            );
-          }
-        });
-        _scrollToBottom();
-      }
-    } catch (_) {}
-    if (mounted && widget.checkIn) {
+      final page = await ApiClient.instance.getChatWindow(
+        before: _olderCursor != null ? _windowEnd : _windowStart,
+        cursor: _olderCursor,
+      );
+      if (!mounted) return;
+      final seen = _messages.map((m) => m.id).whereType<String>().toSet();
+      final messages = (page['messages'] as List)
+          .cast<Map<String, dynamic>>()
+          .map(_fromHistory)
+          .where((m) => !seen.contains(m.id))
+          .toList();
       setState(() {
-        _messages.add(
-          ChatMessage(
-            text:
-                '¿Cómo vas? Cuéntame qué estás haciendo ahora. '
-                'Tu respuesta quedará guardada con la hora para recordar cómo fue tu día.',
-            isUser: false,
-            timestamp: DateTime.now(),
+        _messages.insertAll(0, messages);
+        _windowEnd = DateTime.parse(page['window_end']);
+        _windowStart = DateTime.parse(page['window_start']);
+        _olderCursor = page['next_cursor'];
+        _hasOlder = page['has_older'] == true;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _historyError =
+              'No se pudo cargar lo anterior. Toca para reintentar.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _olderLoading = false);
+    }
+  }
+
+  Future<void> _loadHistory() async {
+    setState(() => _historyLoading = true);
+    try {
+      Map<String, dynamic>? checkIn;
+      if (widget.checkIn) {
+        checkIn = await ApiClient.instance.openCheckIn(
+          widget.notification ??
+              {
+                'notification_key':
+                    'manual-${DateTime.now().microsecondsSinceEpoch}',
+                'kind': 'check_in',
+              },
+        );
+      }
+      final page = await ApiClient.instance.getChatWindow();
+      if (!mounted) return;
+      setState(() {
+        _messages.clear();
+        _messages.addAll(
+          (page['messages'] as List).cast<Map<String, dynamic>>().map(
+            _fromHistory,
           ),
         );
+        if (checkIn != null && !_messages.any((m) => m.id == checkIn!['id'])) {
+          _messages.add(_fromHistory(checkIn));
+        }
+        _windowEnd = DateTime.parse(page['window_end']);
+        _windowStart = DateTime.parse(page['window_start']);
+        _olderCursor = page['next_cursor'];
+        _hasOlder = page['has_older'] == true;
+        _historyError = null;
       });
-      _scrollToBottom();
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _historyError = 'No se pudo cargar el historial. Reintentar',
+        );
+      }
     }
+    final pending = await ApiClient.instance.getPendingProposal();
+    if (mounted && pending != null) {
+      setState(
+        () => _messages.add(
+          ChatMessage(
+            text: 'Cambio pendiente de aprobar',
+            isUser: false,
+            timestamp: DateTime.now(),
+            proposal: pending,
+          ),
+        ),
+      );
+    }
+    if (mounted) setState(() => _historyLoading = false);
   }
 
   @override
@@ -124,7 +210,7 @@ class _ChatScreenState extends State<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
+          0,
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
         );
@@ -134,7 +220,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _sendMessage() async {
     final text = _controller.text.trim();
-    if (text.isEmpty || _isGenerating) return;
+    if (text.isEmpty || _isGenerating || _uploading || _historyLoading) return;
 
     if (_checkInPending) {
       if (_checkInActivity != text) {
@@ -178,18 +264,11 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     _scrollToBottom();
 
-    final assistantMsgIndex = _messages.length - 1;
-
-    // Build history
-    final history = _messages
-        .take(_messages.length - 2)
-        .map((m) => {'text': m.text, 'is_user': m.isUser})
-        .toList();
+    final assistantMessage = _messages.last;
 
     try {
       final stream = ApiClient.instance.streamChat(
         message: text,
-        history: history,
         date: widget.agendaDate,
       );
 
@@ -197,25 +276,26 @@ class _ChatScreenState extends State<ChatScreen> {
         if (!mounted) break;
         if (event is ChatTokenEvent) {
           setState(() {
-            _messages[assistantMsgIndex].text += event.token;
+            assistantMessage.text += event.token;
           });
-          _scrollToBottom();
+          if (_scrollController.hasClients && _scrollController.offset < 160) {
+            _scrollToBottom();
+          }
         } else if (event is ChatProposalEvent) {
           setState(() {
-            _messages[assistantMsgIndex].proposal = event.proposal;
+            assistantMessage.proposal = event.proposal;
           });
           _scrollToBottom();
         } else if (event is ChatErrorEvent) {
           setState(() {
-            _messages[assistantMsgIndex].text = event.message;
+            assistantMessage.text = event.message;
           });
         }
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _messages[assistantMsgIndex].text =
-              'No se pudo conectar con el servidor: $e';
+          assistantMessage.text = 'No se pudo conectar con el servidor: $e';
         });
       }
     } finally {
@@ -226,11 +306,86 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _attachFile(bool photos) async {
+    setState(() {
+      _uploading = true;
+      _uploadProgress = 0;
+    });
+    try {
+      final file = await pickAgendaFile(photos: photos);
+      if (file == null) return;
+      final doc = await ApiClient.instance.uploadDocument(
+        file,
+        onProgress: (progress) {
+          if (mounted) setState(() => _uploadProgress = progress);
+        },
+      );
+      if (!mounted) return;
+      final name = (doc['title'] as String).replaceAll(
+        RegExp(r'[\[\]()`<>\\]'),
+        '',
+      );
+      final link = '[$name](/v1/documents/${doc['id']}/download)';
+      setState(() {
+        _messages.add(
+          ChatMessage(
+            text: 'Archivo guardado: $link',
+            isUser: false,
+            timestamp: DateTime.now(),
+          ),
+        );
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Archivo guardado. Puedes recuperarlo en Mis archivos.',
+          ),
+        ),
+      );
+      _scrollToBottom();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('No se pudo subir: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
   /// Limpia citas documentales internas ([D1], [D2]) y apéndices técnicos
   /// de procedencia para ofrecer una experiencia conversacional limpia y ejecutiva.
   String _cleanMessageText(String text) {
     if (text.isEmpty) return text;
     var cleaned = text;
+    // Never render the machine-readable proposal or an unfinished streamed block.
+    final proposalIndex = cleaned.indexOf('```proposal');
+    if (proposalIndex != -1) {
+      final block = RegExp(
+        r'```proposal\s*(\{.*?\})\s*```',
+        dotAll: true,
+      ).firstMatch(cleaned);
+      if (block != null) {
+        cleaned = cleaned.replaceFirst(block.group(0)!, '');
+        if (cleaned
+            .split('Fuentes disponibles')
+            .first
+            .replaceAll('---', '')
+            .trim()
+            .isEmpty) {
+          try {
+            final proposal =
+                jsonDecode(block.group(1)!) as Map<String, dynamic>;
+            cleaned = 'Propuesta: ${proposal['summary'] ?? "ajuste de agenda"}';
+          } catch (_) {
+            cleaned = 'Propuesta de ajuste de agenda.';
+          }
+        }
+      } else {
+        cleaned = cleaned.substring(0, proposalIndex);
+        if (cleaned.trim().isEmpty) cleaned = 'Preparando propuesta…';
+      }
+    }
 
     // 1. Omitir el bloque de apéndice de fuentes documentales
     final appendixIndex = cleaned.indexOf('\n\n---\nFuentes disponibles');
@@ -241,8 +396,9 @@ class _ChatScreenState extends State<ChatScreen> {
     if (altAppendixIndex != -1) {
       cleaned = cleaned.substring(0, altAppendixIndex);
     }
-    final plainAppendixIndex =
-        cleaned.indexOf('Fuentes disponibles para esta respuesta:');
+    final plainAppendixIndex = cleaned.indexOf(
+      'Fuentes disponibles para esta respuesta:',
+    );
     if (plainAppendixIndex != -1) {
       cleaned = cleaned.substring(0, plainAppendixIndex);
     }
@@ -260,6 +416,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        actions: [
+          IconButton(
+            tooltip: 'Mis archivos',
+            icon: const Icon(Icons.folder_open_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(builder: (_) => const DocumentLibrary()),
+            ),
+          ),
+        ],
         titleSpacing: 0,
         title: Row(
           children: [
@@ -299,16 +465,53 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
+              reverse: true,
               padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
+              itemCount: _messages.length + 1,
               itemBuilder: (context, index) {
-                final msg = _messages[index];
+                if (index == _messages.length) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Column(
+                      children: [
+                        if (_windowStart != null)
+                          Text(
+                            'Historial desde ${DateFormat("dd/MM HH:mm").format(_windowStart!.toLocal())}',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        if (_olderLoading) const CircularProgressIndicator(),
+                        if (_historyError != null)
+                          TextButton(
+                            onPressed: _windowStart == null
+                                ? _loadHistory
+                                : _loadOlder,
+                            child: Text(_historyError!),
+                          )
+                        else if (_hasOlder && !_olderLoading)
+                          TextButton(
+                            onPressed: _loadOlder,
+                            child: const Text('Cargar 12 horas anteriores'),
+                          )
+                        else if (!_historyLoading && !_olderLoading)
+                          const Text('Inicio de la conversación'),
+                      ],
+                    ),
+                  );
+                }
+                final msg = _messages[_messages.length - 1 - index];
                 return Column(
                   crossAxisAlignment: msg.isUser
                       ? CrossAxisAlignment.end
                       : CrossAxisAlignment.start,
                   children: [
-                    if (msg.text.isNotEmpty || msg.isUser)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10, bottom: 4),
+                      child: Text(
+                        DateFormat('dd/MM · HH:mm').format(msg.timestamp),
+                        style: theme.textTheme.labelSmall,
+                      ),
+                    ),
+                    if (msg.text.isNotEmpty || msg.isUser || _isGenerating)
                       Container(
                         margin: const EdgeInsets.only(bottom: 8),
                         constraints: BoxConstraints(
@@ -371,6 +574,12 @@ class _ChatScreenState extends State<ChatScreen> {
                                     )
                                   : MarkdownBody(
                                       data: _cleanMessageText(msg.text),
+                                      onTapLink: (text, href, title) {
+                                        if (href != null &&
+                                            href.startsWith('/v1/documents/')) {
+                                          openAgendaDocument(context, href);
+                                        }
+                                      },
                                       selectable: true,
                                       softLineBreak: true,
                                       styleSheet:
@@ -477,7 +686,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                           ),
                                     )),
                       ),
-                    if (msg.proposal != null)
+                    if (msg.proposal != null &&
+                        msg.proposal!.status == ProposalStatus.pending)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: AgentProposalCard(
@@ -485,6 +695,13 @@ class _ChatScreenState extends State<ChatScreen> {
                           onAccept: () async {
                             final applied = await ApiClient.instance
                                 .confirmProposal(msg.proposal!.id);
+                            if (applied && mounted) {
+                              setState(
+                                () => msg.proposal = msg.proposal!.copyWith(
+                                  status: ProposalStatus.accepted,
+                                ),
+                              );
+                            }
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
@@ -501,6 +718,13 @@ class _ChatScreenState extends State<ChatScreen> {
                           onDismiss: () async {
                             final rejected = await ApiClient.instance
                                 .rejectProposal(msg.proposal!.id);
+                            if (rejected && mounted) {
+                              setState(
+                                () => msg.proposal = msg.proposal!.copyWith(
+                                  status: ProposalStatus.rejected,
+                                ),
+                              );
+                            }
                             if (!rejected && context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
@@ -519,15 +743,46 @@ class _ChatScreenState extends State<ChatScreen> {
               },
             ),
           ),
+          if (_historyLoading) const LinearProgressIndicator(),
+          if (_uploading)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: [
+                  LinearProgressIndicator(
+                    value: _uploadProgress < 1 ? _uploadProgress : null,
+                  ),
+                  Text(
+                    _uploadProgress < 1
+                        ? 'Subiendo archivo…'
+                        : 'Guardando archivo…',
+                  ),
+                ],
+              ),
+            ),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: Row(
                 children: [
+                  PopupMenuButton<bool>(
+                    tooltip: 'Adjuntar archivo',
+                    enabled: !_isGenerating && !_uploading && !_historyLoading,
+                    icon: const Icon(Icons.attach_file),
+                    onSelected: _attachFile,
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: true, child: Text('Subir foto')),
+                      PopupMenuItem(
+                        value: false,
+                        child: Text('Subir documento'),
+                      ),
+                    ],
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _controller,
-                      enabled: !_isGenerating,
+                      enabled:
+                          !_isGenerating && !_uploading && !_historyLoading,
                       decoration: InputDecoration(
                         hintText: _isGenerating
                             ? 'Generando respuesta...'
@@ -567,7 +822,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   const SizedBox(width: 8),
                   IconButton.filled(
-                    onPressed: _isGenerating ? null : _sendMessage,
+                    onPressed: _isGenerating || _uploading || _historyLoading
+                        ? null
+                        : _sendMessage,
                     icon: _isGenerating
                         ? SizedBox(
                             width: 18,

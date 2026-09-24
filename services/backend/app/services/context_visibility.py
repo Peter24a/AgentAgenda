@@ -39,3 +39,23 @@ def memory_source_visibility(user_id):
         ~unsafe_source,
         or_(Memory.source_kind != "document", has_document_source),
     )
+
+
+def document_context_filters(user_id, recipient_id=None):
+    """SAFE by default; an explicit grant is restricted to one original revision and recipient."""
+    if not recipient_id:
+        return safe_document_filters(user_id)
+    from app.models.canonical import DocumentContextGrant
+    permitted_origin = exists(select(DocumentOrigin.document_id).where(
+        DocumentOrigin.document_id == Document.id,
+        DocumentOrigin.privacy_class.in_(("SAFE", "OPT_IN")),
+    ).correlate(Document))
+    grant = exists(select(DocumentContextGrant.id).where(
+        DocumentContextGrant.user_id == user_id,
+        DocumentContextGrant.document_id == Document.id,
+        DocumentContextGrant.revision_id == DocumentRevision.id,
+        DocumentContextGrant.recipient_id == recipient_id,
+        DocumentContextGrant.revoked_at.is_(None),
+    ).correlate(Document, DocumentRevision))
+    return (Document.user_id == user_id, Document.is_deleted.is_(False),
+            or_(and_(*safe_document_filters(user_id)), and_(permitted_origin, grant)))

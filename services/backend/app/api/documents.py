@@ -135,6 +135,7 @@ async def list_documents(
     doc_type: Optional[str] = Query(None, description="Filtro por categoría documental"),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    include_text: bool = Query(True, description="Desactivar para un catálogo ligero sin texto extraído"),
     session: AsyncSession = Depends(get_db_session),
     auth: AuthContext = Depends(require_scope("documents:read")),
 ):
@@ -145,6 +146,7 @@ async def list_documents(
         doc_type=doc_type,
         limit=limit,
         offset=offset,
+        include_text=include_text,
     )
 
 

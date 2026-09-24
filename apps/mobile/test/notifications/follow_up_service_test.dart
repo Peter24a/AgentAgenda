@@ -70,27 +70,24 @@ void main() {
       expect(driver.notices, isEmpty);
     },
   );
-  test(
-    'Repeated sync is idempotent and removed/completed events cancel notices',
-    () async {
-      final driver = FakeNotifications();
-      var events = [event];
-      final service = FollowUpService(
-        driver: driver,
-        now: () => now,
-        supported: true,
-        loader: (_, _) async => events,
-      );
-      await service.enableFromUserAction();
-      expect(driver.notices, hasLength(1));
-      await service.synchronize();
-      expect(driver.scheduledCalls, 1);
-      events = [event.copyWith(isCompleted: true)];
-      await service.synchronize();
-      expect(driver.notices, isEmpty);
-      expect(driver.cancelled, hasLength(1));
-    },
-  );
+  test('Repeated sync is idempotent and removed events cancel reminders without cancelling conversations', () async {
+    final driver = FakeNotifications();
+    var events = [event];
+    final service = FollowUpService(
+      driver: driver,
+      now: () => now,
+      supported: true,
+      loader: (_, _) async => events,
+    );
+    await service.enableFromUserAction();
+    expect(driver.notices, hasLength(7));
+    await service.synchronize();
+    expect(driver.scheduledCalls, 7);
+    events = [];
+    await service.synchronize();
+    expect(driver.notices, hasLength(6));
+    expect(driver.cancelled, hasLength(1));
+  });
   test(
     'Time changes replace the schedule and explicit deletion cancels offline',
     () async {
@@ -103,17 +100,20 @@ void main() {
         loader: (_, _) async => events,
       );
       await service.enableFromUserAction();
-      final id = driver.notices.keys.single;
+      final id = driver.notices.values
+          .singleWhere((n) => n.kind == 'reminder')
+          .notificationId;
       events = [
         event.copyWith(
+          startTime: event.startTime.add(const Duration(minutes: 15)),
           endTime: event.endTime!.add(const Duration(minutes: 15)),
         ),
       ];
       await service.synchronize();
-      expect(driver.notices.keys.single, id);
-      expect(driver.scheduledCalls, 2);
+      expect(driver.notices.containsKey(id), isFalse);
+      expect(driver.scheduledCalls, 8);
       await service.removeEvent(event.id);
-      expect(driver.notices, isEmpty);
+      expect(driver.notices, hasLength(6));
     },
   );
   test('Restart keeps minimal cache and offline sync preserves last successful timestamp', () async {
@@ -133,14 +133,11 @@ void main() {
     );
     await restarted.init();
     await restarted.synchronize();
-    expect(driver.notices, hasLength(1));
+    expect(driver.notices, hasLength(7));
     expect(restarted.lastSynced, now);
     expect(restarted.error, contains('última sincronización'));
     final prefs = await SharedPreferences.getInstance();
-    expect(
-      prefs.getString(FollowUpService.cacheKey),
-      isNot(contains(event.title)),
-    );
+    expect(prefs.getString(FollowUpService.cacheKey), contains(event.title));
   });
   test(
     'Permission denial yields no schedules; disabling cancels persisted IDs',
@@ -157,7 +154,7 @@ void main() {
       expect(driver.notices, isEmpty);
       driver.granted = true;
       await service.refreshPermissions();
-      expect(driver.notices, hasLength(1));
+      expect(driver.notices, hasLength(7));
       await service.saveSettings(service.settings.copyWith(enabled: false));
       expect(driver.notices, isEmpty);
     },
