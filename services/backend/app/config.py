@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     llm_model: str = os.getenv("LLM_MODEL", "qwen-local")
     llm_timeout_seconds: float = float(os.getenv("LLM_TIMEOUT", "90.0"))
 
+    # Motor de OCR multimodal (GLM-OCR vía LLM Gateway en GPU)
+    ocr_model: str = os.getenv("OCR_MODEL", "glm-ocr")
+    ocr_timeout_seconds: float = float(os.getenv("OCR_TIMEOUT", "60.0"))
+    ocr_enabled: bool = os.getenv("OCR_ENABLED", "true").lower() in ("true", "1", "yes")
+
     # Zonas horarias y temporalidad canónica
     default_timezone: str = os.getenv("DEFAULT_TIMEZONE", "America/Mexico_City")
     

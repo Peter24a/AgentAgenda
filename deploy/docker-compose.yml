@@ -67,10 +67,15 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://agentagenda:agentagendapass@db:5432/agentagenda
       - STORAGE_PATH=/storage
+      - LLM_API_BASE=http://llm-gateway:8000/v1
+      - LLM_API_KEY=${LLM_API_KEY:?Set the AgentAgenda application key in deploy/.env}
+      - OCR_MODEL=glm-ocr
+      - OCR_TIMEOUT=60.0
     volumes:
       - document_storage:/storage
     networks:
       - default
+      - llm-apps
 
 volumes:
   pg_data:

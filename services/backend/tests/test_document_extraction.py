@@ -253,3 +253,46 @@ async def test_worker_atomic_claim_rejects_stale_pending_job(db_session):
         assert await worker.process_single_job(other_session, stale_job) is None
     await db_session.refresh(job)
     assert job.attempts == 1
+
+
+def test_ocr_with_gpu_gateway_success(tmp_path, monkeypatch):
+    from PIL import Image
+    img_path = tmp_path / "page.png"
+    img = Image.new("RGB", (100, 100), color=(255, 255, 255))
+    img.save(img_path)
+
+    monkeypatch.setattr(extraction.settings, "ocr_enabled", True)
+    monkeypatch.setattr(extraction.settings, "llm_api_base", "http://mock-gateway:8000/v1")
+    monkeypatch.setattr(extraction.settings, "ocr_model", "glm-ocr")
+
+    class MockResponse:
+        status = 200
+        def read(self):
+            import json
+            return json.dumps({
+                "choices": [{"message": {"content": "Texto extraído por GLM-OCR"}}]
+            }).encode("utf-8")
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr(extraction.urllib.request, "urlopen", lambda req, timeout: MockResponse())
+    result = extraction._ocr_with_gpu_gateway(img_path, deadline=extraction.time.monotonic() + 10)
+    assert result == "Texto extraído por GLM-OCR"
+
+
+def test_ocr_with_gpu_gateway_fallback_on_error(tmp_path, monkeypatch):
+    img_path = tmp_path / "page.png"
+    img_path.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+    monkeypatch.setattr(extraction.settings, "ocr_enabled", True)
+    monkeypatch.setattr(extraction.settings, "llm_api_base", "http://mock-gateway:8000/v1")
+    monkeypatch.setattr(extraction.settings, "ocr_model", "glm-ocr")
+
+    def mock_urlopen_fail(req, timeout):
+        raise extraction.urllib.error.URLError("Connection refused")
+
+    monkeypatch.setattr(extraction.urllib.request, "urlopen", mock_urlopen_fail)
+    result = extraction._ocr_with_gpu_gateway(img_path, deadline=extraction.time.monotonic() + 10)
+    assert result is None
