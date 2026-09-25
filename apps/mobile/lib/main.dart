@@ -31,7 +31,7 @@ class AgentAgendaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'SARA Agenda',
+      title: 'Walter Agenda',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
