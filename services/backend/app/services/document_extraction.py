@@ -4,7 +4,11 @@ Limits are rejection thresholds, not truncation lengths. OCR tools run locally,
 with bounded subprocess deadlines; callers must run this service off the event loop.
 """
 
+import base64
 from dataclasses import dataclass
+import io
+import json
+import logging
 import os
 from pathlib import Path
 import shutil
@@ -12,11 +16,17 @@ import subprocess
 import tempfile
 import time
 from typing import Optional
+import urllib.error
+import urllib.request
 from zipfile import ZipFile
 
 from docx import Document as WordDocument
 from docx.table import Table
 from pypdf import PdfReader
+
+from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 MAX_FILE_BYTES = 50 * 1024 * 1024
@@ -82,7 +92,81 @@ def _ocr_language(deadline: float) -> str:
     return "+".join(languages)
 
 
+def _ocr_with_gpu_gateway(path: Path, deadline: float) -> Optional[str]:
+    """Attempt GPU-accelerated OCR via the LLM gateway (e.g. GLM-OCR)."""
+    if not getattr(settings, "ocr_enabled", True):
+        return None
+    api_base = getattr(settings, "llm_api_base", "").strip()
+    model = getattr(settings, "ocr_model", "").strip()
+    if not api_base or not model:
+        return None
+    remaining = deadline - time.monotonic()
+    if remaining <= 1.0:
+        return None
+
+    try:
+        mime_type = "image/png"
+        raw_bytes: bytes
+        try:
+            from PIL import Image
+            with Image.open(path) as img:
+                if img.mode not in ("RGB", "L"):
+                    img = img.convert("RGB")
+                max_side = max(img.width, img.height)
+                if max_side > 1500:
+                    scale = 1500.0 / max_side
+                    new_w = max(1, int(img.width * scale))
+                    new_h = max(1, int(img.height * scale))
+                    img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                buf = io.BytesIO()
+                img.save(buf, format="PNG")
+                raw_bytes = buf.getvalue()
+        except Exception as img_err:
+            logger.debug("PIL image normalization skipped: %s", img_err)
+            raw_bytes = path.read_bytes()
+
+        if len(raw_bytes) > 8 * 1024 * 1024:
+            return None
+
+        b64_img = base64.b64encode(raw_bytes).decode("utf-8")
+        payload = json.dumps({
+            "model": model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Extract all text from this image accurately."},
+                        {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{b64_img}"}},
+                    ],
+                }
+            ],
+            "max_tokens": 4096,
+        }).encode("utf-8")
+
+        timeout = min(getattr(settings, "ocr_timeout_seconds", 60.0), remaining)
+        endpoint = f"{api_base.rstrip('/')}/chat/completions"
+        headers = {"Content-Type": "application/json"}
+        api_key = settings.llm_api_key.get_secret_value() if hasattr(settings, "llm_api_key") else ""
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
+        req = urllib.request.Request(endpoint, data=payload, headers=headers)
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            if resp.status == 200:
+                data = json.loads(resp.read().decode("utf-8"))
+                content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                cleaned = _clean_text(content)
+                if cleaned:
+                    return cleaned
+    except Exception as exc:
+        logger.warning("GPU OCR via gateway failed (%s), falling back to local OCR", exc)
+    return None
+
+
 def _ocr_image(path: Path, language: str, deadline: float) -> str:
+    gpu_result = _ocr_with_gpu_gateway(path, deadline)
+    if gpu_result is not None and gpu_result.strip():
+        return gpu_result
     return _clean_text(_run_ocr_tool(
         ["tesseract", str(path), "stdout", "-l", language, "--psm", "3"], deadline
     ))
@@ -95,7 +179,7 @@ def _ocr_pdf_page(path: Path, number: int, language: str, deadline: float) -> st
         prefix = Path(directory) / "page"
         _run_ocr_tool([
             "pdftoppm", "-f", str(number), "-l", str(number), "-singlefile",
-            "-scale-to", "3000", "-png", str(path), str(prefix),
+            "-scale-to", "1500", "-png", str(path), str(prefix),
         ], deadline)
         return _ocr_image(prefix.with_suffix(".png"), language, deadline)
 
