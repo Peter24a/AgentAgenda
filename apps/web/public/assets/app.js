@@ -40,7 +40,7 @@ function icon(name) {
 function button(text, action, style = '', iconName = null) { return el('button', {type: 'button', class: `button ${style}`, onclick: action}, iconName && icon(iconName), text); }
 function iconButton(name, title, action, danger = false) { return el('button', {type: 'button', class: `icon-button${danger ? ' danger' : ''}`, title, 'aria-label': title, onclick: action}, icon(name)); }
 function link(text, href, style = '', iconName = null) { return el('a', {href, class: style}, iconName && icon(iconName), text); }
-function brand() { return el('a', {href: '/', class: 'brand'}, el('img', {src: '/assets/brand.svg', alt: '', width: 37, height: 37}), 'AgentAgenda'); }
+function brand(href = '/') { return el('a', {href, class: 'brand'}, el('img', {src: '/assets/brand.svg', alt: '', width: 37, height: 37}), 'AgentAgenda'); }
 function field(label, name, options = {}) {
   const input = el(options.tag || 'input', {id: `field-${name}`, name, type: options.type || 'text', ...options});
   input.removeAttribute('tag'); input.removeAttribute('hint');
@@ -82,33 +82,14 @@ function content(path, options = {}) { return api(apiPath(`/v1${path}`), options
 function stopBackground() { if (state.timer) clearTimeout(state.timer); state.timer = null; if (state.stream) state.stream.abort(); state.stream = null; }
 function startScreen() { state.epoch += 1; stopBackground(); document.querySelectorAll('dialog').forEach(node => node.remove()); return state.epoch; }
 function displayError(container, error, retry) { container.replaceChildren(notice(error.message, 'error'), retry && button('Intentar de nuevo', retry, 'secondary small', 'refresh')); }
-function publicHeader(active = '') { return el('header', {class: 'public-header'}, brand(), el('nav', {class: 'public-nav', 'aria-label': 'Navegación principal'}, link('Mi espacio', '/app', 'nav-link'), link(active === 'activation' ? 'Descargar app' : 'Activar espacio', active === 'activation' ? '/download/agentagenda.apk' : '/activar', 'button secondary small'))); }
+function publicHeader(active = '') { return el('header', {class: 'public-header'}, brand(active === 'activation' ? '/activar' : '/app'), el('nav', {class: 'public-nav', 'aria-label': 'Navegación principal'}, link('Mi espacio', '/app', 'nav-link'), link(active === 'activation' ? 'Descargar app' : 'Activar espacio', active === 'activation' ? '/download/agentagenda.apk' : '/activar', 'button secondary small'))); }
+function adminHeader() { return el('header', {class: 'public-header'}, brand(), link('Descargar app', '/download/agentagenda.apk', 'button secondary small', 'download')); }
 function publicFooter() { return el('footer', {class: 'public-footer'}, el('span', {}, 'Una agenda. Un espacio propio.'), el('span', {}, link('Administración', '/admin', 'nav-link'), ' · AgentAgenda')); }
 function pageHeader(eyebrow, title, description = '', action = null) { return el('div', {class: 'page-header'}, el('div', {}, el('p', {class: 'eyebrow'}, eyebrow), el('h1', {}, title), description && el('p', {}, description)), action); }
 function panel(title, children, action = null) { return el('section', {class: 'panel'}, el('div', {class: 'panel-title'}, el('h2', {}, title), action), children); }
 function metadata(entries) { return el('dl', {class: 'metadata'}, entries.map(([title, value]) => el('div', {}, el('dt', {}, title), el('dd', {}, value)))); }
 
-function showHome() {
-  startScreen(); document.title = 'AgentAgenda · Tu espacio personal';
-  const today = new Date();
-  const week = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-  const currentWeekday = new Intl.DateTimeFormat('en-US', {timeZone: TIMEZONE, weekday: 'short'}).format(today);
-  const todayIndex = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(currentWeekday);
-  const monday = new Date(`${localDay(today)}T12:00:00Z`); monday.setUTCDate(monday.getUTCDate() - todayIndex);
-  const weekDates = week.map((_, index) => { const date = new Date(monday); date.setUTCDate(date.getUTCDate() + index); return date.getUTCDate(); });
-  const visual = el('div', {class: 'illustration', 'aria-label': 'Agenda, conversación y documentos reunidos en un espacio personal'},
-    el('div', {class: 'workspace-paper'}, el('p', {class: 'eyebrow'}, icon('lock'), 'TU ESPACIO'), el('h2', {class: 'serif'}, 'Todo, en su lugar.'),
-      el('div', {class: 'workspace-date'}, today.toLocaleDateString('es-MX', {timeZone: TIMEZONE, month: 'long', year: 'numeric'})),
-      el('div', {class: 'week-strip', 'aria-hidden': true}, week.map((label, index) => el('span', {class: index === todayIndex ? 'today' : ''}, label, el('b', {}, weekDates[index])))),
-      [['calendar', 'Tu agenda', 'Planes, actividades y pendientes.'], ['chat', 'Tu asistente', 'Una conversación para organizarte.'], ['file', 'Tus documentos', 'Archivos disponibles cuando los necesitas.']].map(([name, title, text]) => el('div', {class: 'paper-line'}, el('div', {class: 'paper-icon'}, icon(name)), el('div', {}, el('h3', {}, title), el('p', {}, text)), el('span', {class: 'paper-arrow'}, icon('arrow'))))),
-    el('p', {class: 'landing-caption'}, 'Un mismo lugar para lo que importa.'));
-  root.replaceChildren(publicHeader(), el('main', {id: 'main', class: 'landing'},
-    el('section', {class: 'hero'}, el('div', {}, el('p', {class: 'eyebrow'}, 'TU DÍA, CON MÁS CLARIDAD'), el('h1', {class: 'serif'}, 'Haz espacio para ', el('em', {}, 'tu vida.')), el('p', {}, 'Reúne tu agenda, conversaciones y documentos en un espacio personal. Conecta tu app y continúa donde lo dejaste.'), el('div', {class: 'hero-actions'}, link('Activar mi espacio', '/activar', 'button', 'arrow'), link('Descargar para Android', '/download/agentagenda.apk', 'button secondary', 'download')), el('div', {class: 'hero-note'}, icon('lock'), 'Acceso mediante un código personal de activación.')), visual),
-    el('section', {class: 'how', 'aria-labelledby': 'how-title'}, el('div', {}, el('p', {class: 'eyebrow'}, 'EMPEZAR ES SIMPLE'), el('h2', {id: 'how-title', class: 'serif'}, 'Tu espacio te espera.')),
-      el('div', {class: 'steps'}, [['01', 'Recibe tu código', 'El administrador prepara tu espacio y te entrega un código temporal.'], ['02', 'Conecta tu app', 'Instala AgentAgenda e introduce el código. También puedes empezar desde el navegador.'], ['03', 'Continúa tu día', 'Accede a tu agenda, conversa con tu asistente y guarda tus documentos.']].map(([n, title, text]) => el('div', {}, el('span', {class: 'step-number'}, n), el('h3', {}, title), el('p', {}, text)))))), publicFooter());
-}
-
-function authLayout({eyebrow, title, copy, card, activation = false}) { root.replaceChildren(publicHeader(activation ? 'activation' : ''), el('main', {id: 'main', class: 'auth-layout'}, el('div', {class: 'auth-copy'}, el('p', {class: 'eyebrow'}, eyebrow), el('h1', {class: 'serif'}, title), el('p', {}, copy)), card), publicFooter()); }
+function authLayout({eyebrow, title, copy, card, activation = false}) { root.replaceChildren(activation ? publicHeader('activation') : adminHeader(), el('main', {id: 'main', class: 'auth-layout'}, el('div', {class: 'auth-copy'}, el('p', {class: 'eyebrow'}, eyebrow), el('h1', {class: 'serif'}, title), el('p', {}, copy)), card), activation ? publicFooter() : el('footer', {class: 'public-footer'}, 'AgentAgenda · Administración del servicio')); }
 function showActivation() {
   startScreen(); document.title = 'Conectar mi espacio · AgentAgenda';
   const params = new URLSearchParams(location.hash.slice(1)); const initialCode = params.get('code') || '';
@@ -133,7 +114,7 @@ function showAdminLogin(errorText = '') {
     try { state.admin = await control('/auth/login', {method: 'POST', body: {username: data.get('username'), password: data.get('password')}}); form.reset(); showAdmin(); }
     catch (error) { formError(form, error); } finally { submit.disabled = false; }
   });
-  authLayout({eyebrow: 'ADMINISTRACIÓN', title: 'Un espacio para cada persona.', copy: 'Prepara espacios, entrega accesos y administra el servicio desde un mismo lugar. El panel muestra información operativa; cada cliente tiene su sesión privada.', card: el('section', {class: 'panel auth-card'}, el('h2', {}, 'Acceso administrativo'), el('p', {}, 'Usa tus credenciales de administrador.'), form, el('p', {class: 'auth-footnote'}, 'Para abrir tu agenda personal, ', link('conecta tu espacio', '/activar'), '.'))});
+  authLayout({eyebrow: 'ADMINISTRACIÓN', title: 'Administración de espacios.', copy: 'Crea espacios para tus clientes, genera códigos de acceso y administra el estado del servicio.', card: el('section', {class: 'panel auth-card'}, el('h2', {}, 'Acceso administrativo'), el('p', {}, 'Usa tus credenciales de administrador.'), form, el('p', {class: 'auth-footnote'}, 'Para abrir tu agenda personal, ', link('conecta tu espacio', '/activar'), '.'))});
 }
 
 function shell(mode, active, contentNode) {
@@ -143,7 +124,7 @@ function shell(mode, active, contentNode) {
   const logout = button('Salir', async event => {
     await busy(event.currentTarget, async () => { await api(admin ? '/control/v1/auth/logout' : '/platform/v1/logout', {method: 'POST', scope: admin ? 'admin' : 'owner'}); if (admin) { state.admin = null; showAdminLogin(); } else { state.session = null; history.replaceState(null, '', '/activar'); showActivation(); } });
   }, 'ghost small logout', 'logout');
-  const side = el('aside', {class: 'sidebar'}, brand(), el('p', {class: 'eyebrow sidebar-label'}, admin ? 'CONTROL DEL SERVICIO' : 'MI ESPACIO'), nav, el('div', {class: 'sidebar-bottom'}, el('div', {class: 'identity'}, el('div', {class: 'avatar'}, displayName.slice(0, 2).toUpperCase()), el('div', {class: 'identity-text'}, el('strong', {}, displayName), el('small', {}, admin ? 'Administrador' : 'Espacio personal'))), logout));
+  const side = el('aside', {class: 'sidebar'}, brand(admin ? '/' : '/app'), el('p', {class: 'eyebrow sidebar-label'}, admin ? 'CONTROL DEL SERVICIO' : 'MI ESPACIO'), nav, el('div', {class: 'sidebar-bottom'}, el('div', {class: 'identity'}, el('div', {class: 'avatar'}, displayName.slice(0, 2).toUpperCase()), el('div', {class: 'identity-text'}, el('strong', {}, displayName), el('small', {}, admin ? 'Administrador' : 'Espacio personal'))), logout));
   root.replaceChildren(el('div', {class: 'app-layout'}, side, el('main', {id: 'main', class: 'app-content'}, el('div', {class: 'topbar'}, el('span', {}, admin ? 'Administración / AgentAgenda' : `Mi espacio / ${displayName}`), el('span', {class: 'connection'}, 'Sesión autenticada')), contentNode)));
 }
 
@@ -416,17 +397,16 @@ function confirmRevokeDevice(device, current) {
 }
 
 async function bootstrap() {
-  if (location.pathname === '/') { showHome(); return; }
   if (location.pathname === '/activar') { showActivation(); return; }
-  if (location.pathname === '/admin') {
-    root.replaceChildren(publicHeader(), el('main', {id: 'main'}, loading('Comprobando sesión administrativa…')));
+  if (location.pathname === '/' || location.pathname === '/admin') {
+    root.replaceChildren(adminHeader(), el('main', {id: 'main'}, loading('Comprobando sesión administrativa…')));
     try { state.admin = await control('/auth/me'); showAdmin(); } catch (error) { showAdminLogin(error.status === 401 ? '' : error.message); } return;
   }
   if (location.pathname === '/app') {
     root.replaceChildren(publicHeader(), el('main', {id: 'main'}, loading('Conectando tu espacio…')));
     try { state.session = await api('/platform/v1/session'); showPrivate(); } catch (error) { history.replaceState(null, '', '/activar'); showActivation(); if (error.status !== 401) toast(error.message, true); } return;
   }
-  showHome();
+  showAdminLogin();
 }
 
 window.addEventListener('pagehide', stopBackground);

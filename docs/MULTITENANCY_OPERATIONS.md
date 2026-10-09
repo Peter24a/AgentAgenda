@@ -8,8 +8,7 @@ La dirección pública es `https://agenda-api.pedroibarra.dev`. El túnel existe
 
 | Componente | Ubicación o función |
 | --- | --- |
-| Página pública | `/`, con descarga del APK general |
-| Panel administrativo | `/admin`; cuenta administrativa independiente de la agenda de Pedro |
+| Panel administrativo | `/` y `/admin`; acceso directo con cuenta administrativa independiente de la agenda de Pedro |
 | Activación del navegador | `/activar` |
 | Dashboard del propietario | `/app`: agenda, conversación, documentos y dispositivos |
 | Administración por API | `/control/v1/*` |

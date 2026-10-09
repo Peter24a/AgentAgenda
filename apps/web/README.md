@@ -1,6 +1,6 @@
 # AgentAgenda web
 
-Interfaz en español, sin compilación ni dependencias externas. `public/` se sirve desde la plataforma FastAPI mediante `PLATFORM_WEB_ROOT`. La misma entrada publica `/`, `/admin`, `/activar` y `/app`; los recursos están en `/assets/`.
+Interfaz en español, sin compilación ni dependencias externas. `public/` se sirve desde la plataforma FastAPI mediante `PLATFORM_WEB_ROOT`. `/` y `/admin` abren directamente el panel administrativo, sin portada pública; `/activar` conecta a los clientes y `/app` abre su espacio privado. Los recursos están en `/assets/`.
 
 El panel administrativo usa `/control/v1` y una sesión independiente. El dashboard privado usa `/platform/v1/session` y las rutas `/s/<space_id>/v1`. Las sesiones viven en cookies HttpOnly; JavaScript conserva únicamente los metadatos y tokens CSRF durante la sesión. No hay almacenamiento de secretos en localStorage ni visor administrativo de contenido.
 
