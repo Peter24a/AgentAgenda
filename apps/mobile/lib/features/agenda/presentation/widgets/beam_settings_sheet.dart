@@ -337,7 +337,7 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
                 child: TextField(
                   controller: _serverController,
                   decoration: InputDecoration(
-                    hintText: 'https://agenda-api.pedroibarra.dev',
+                    hintText: 'https://walteragenda.pedroibarra.dev',
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 14,
                       vertical: 12,
@@ -390,9 +390,9 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
             runSpacing: 6,
             children: [
               ActionChip(
-                label: const Text('Servidor Oficial (cite-server)'),
+                label: const Text('Servidor Walter (cite-server)'),
                 onPressed: () {
-                  _serverController.text = 'https://agenda-api.pedroibarra.dev';
+                  _serverController.text = 'https://walteragenda.pedroibarra.dev';
                   _testAndSaveServer();
                 },
               ),

@@ -50,7 +50,7 @@ class ApiClient {
   static String get defaultPlatformUrl {
     const configured = String.fromEnvironment('BACKEND_URL');
     if (configured.isNotEmpty) return configured;
-    return 'https://agenda-api.pedroibarra.dev';
+    return 'https://walteragenda.pedroibarra.dev';
   }
 
   static String get defaultAuthToken =>
