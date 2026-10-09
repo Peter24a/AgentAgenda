@@ -111,6 +111,8 @@ Una respuesta correcta de `/health` sólo confirma la entrada. Verificar además
 
 Las cuotas iniciales limitan documentos almacenados y reservas de subidas. Las cargas incompletas expiran después de 24 horas; los temporales huérfanos consumen capacidad hasta que se depuran. La cuota por cliente no reserva físicamente ese tamaño: vigilar espacio libre tanto en el filesystem LUKS como en el filesystem que contiene su archivo disperso. La capacidad de 64 GiB no se amplía automáticamente.
 
+El detalle de cada espacio muestra bytes almacenados, límite efectivo y porcentaje consumido. Esta medición corresponde a los originales finalizados; el control de subidas también cuenta reservas y temporales. La lista general muestra el límite asignado. La cuota todavía no se edita desde el panel: una ampliación requiere actualizar la configuración persistida y aplicada del backend, coordinada con el ciclo de vida del espacio. Cambiar sólo el registro administrativo no modifica el límite efectivo.
+
 Si una operación de reactivación falla, revisar su log y la salud de los servicios definidos en su `resources.json`. No cambiar el puerto a mano ni ejecutar otro stack con la misma base. El asignador registra el puerto una sola vez y mantiene la asignación durante suspensiones y reinicios.
 
 ## Respaldos
@@ -168,3 +170,13 @@ La validación de código completó 204 pruebas del backend, 11 de plataforma, 3
 La aplicación Android común está compilada y firmada para `com.agentagenda.agent_agenda`. La instalación y reconexión en un teléfono Android físico requieren la comprobación del propietario; las pruebas automatizadas y HTTP no sustituyen esa verificación.
 
 El almacenamiento y los respaldos están cifrados, y las sesiones web contienen credenciales cifradas en servidor. La IA y el OCR procesan texto descifrado en la infraestructura del operador. **Este servicio no ofrece cifrado de extremo a extremo frente al administrador del servidor.** El panel evita mostrar contenido ajeno, pero los privilegios técnicos del dueño de la infraestructura siguen existiendo, conforme al modelo acordado.
+
+## Estado de publicación Android
+
+El APK general `com.agentagenda.agent_agenda`, versión `2.0.0+5`, tiene firma de producción y está listo para instalación directa. La web comparte los colores SARA de la app y sigue el modo claro u oscuro del sistema. La publicación en Google Play todavía está pendiente; no se ha generado un AAB ni se ha subido una versión a Play Console.
+
+Antes de presentar una app nueva, generar el [AAB requerido por Google Play](https://support.google.com/googleplay/android-developer/answer/9844679?hl=en), configurar la firma conservando compatibilidad con el APK distribuido, publicar y enlazar una [política de privacidad](https://support.google.com/googleplay/android-developer/answer/10144311?hl=en) fiel al servidor y completar Data Safety y la ficha de Play.
+
+El APK fusiona permisos de lectura de imágenes, vídeo, audio y almacenamiento externo heredados de `open_filex`; revisar y retirar los accesos amplios que no sean necesarios para la selección puntual y apertura de archivos, conforme a la [política de permisos](https://support.google.com/googleplay/android-developer/answer/16558241?hl=en). Proporcionar un espacio sintético exclusivo con [acceso reutilizable para revisión](https://support.google.com/googleplay/android-developer/answer/15748846?hl=en); los códigos actuales de un uso y 24 horas no sirven para ese propósito. La conversación generativa requiere revisar e implementar el [mecanismo de reporte de respuestas de IA](https://support.google.com/googleplay/android-developer/answer/13985936?hl=en).
+
+La alineación ZIP y segmentos LOAD de 64 bits superan las comprobaciones de 16 KB, pero no se ha validado la ejecución en un dispositivo o emulador con páginas de 16 KB. Revisar las dependencias nativas si falla esa prueba. Cerrar un espacio conserva datos y no equivale a borrarlos; definir y documentar el procedimiento de eliminación antes de declarar la retención y las opciones de borrado a Google y a los clientes.
