@@ -17,13 +17,16 @@ from app.api.jobs import router as jobs_router
 from app.api.device_requests import router as device_requests_router
 from app.api.mcp import router as mcp_router
 from app.api.status import router as status_router
+from app.api.enrollment import router as enrollment_router
+from app.api.devices import router as devices_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize canonical schema & legacy SQLite
     await init_canonical_db()
     await init_db()
-    await seed_initial_data_if_empty()
+    if settings.seed_demo_data:
+        await seed_initial_data_if_empty()
     yield
 
 app = FastAPI(
@@ -53,6 +56,8 @@ app.include_router(jobs_router)
 app.include_router(device_requests_router)
 app.include_router(mcp_router)
 app.include_router(status_router)
+app.include_router(enrollment_router)
+app.include_router(devices_router)
 
 @app.get("/")
 async def root():

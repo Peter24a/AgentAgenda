@@ -93,7 +93,7 @@ async def revoke_credentials(
         device_id = auth.device_id
 
     success, message = await auth_service.revoke(
-        session, raw_token=raw_token, device_id=device_id
+        session, raw_token=raw_token, device_id=device_id, user_id=auth.user_id
     )
     if not success:
         raise HTTPException(

@@ -2,6 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
+import 'space_session.dart';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:mime/mime.dart';
 import 'package:path_provider/path_provider.dart';
@@ -43,83 +47,82 @@ class ApiClient {
   static final ApiClient instance = ApiClient._();
   ApiClient._();
 
-  static const String _prefKey = 'backend_base_url';
-  static const String _tokenPrefKey = 'backend_auth_token';
-  static const String _refreshPrefKey = 'backend_refresh_token';
-
-  static String get defaultPlatformUrl {
-    const configured = String.fromEnvironment('BACKEND_URL');
-    if (configured.isNotEmpty) return configured;
-    return 'https://walteragenda.pedroibarra.dev';
-  }
-
-  static String get defaultAuthToken =>
-      const String.fromEnvironment('AUTH_TOKEN');
-  static String get defaultRefreshToken =>
-      const String.fromEnvironment('REFRESH_TOKEN');
-
-  String _baseUrl = defaultPlatformUrl;
-  String get baseUrl => _baseUrl;
-
-  String? _authToken;
+  static String get defaultPlatformUrl => defaultAgendaServer;
+  final SpaceSessionManager sessions = SpaceSessionManager.instance;
+  late http.Client _client = SpaceHttpClient(sessions);
+  final Set<http.Client> _activeClients = {};
+  String? _testToken;
+  String? _testBaseUrl;
+  String get baseUrl =>
+      sessions.session?.baseUrl ?? _testBaseUrl ?? defaultPlatformUrl;
 
   Map<String, String> get _headers => {
     'Content-Type': 'application/json',
-    if (_authToken != null && _authToken!.isNotEmpty)
-      'Authorization': 'Bearer $_authToken',
+    if (_testToken != null) 'Authorization': 'Bearer $_testToken',
   };
 
   Future<void> init() async {
+    // Remove credentials stored by old APKs. Reconnection preserves server data.
     final prefs = await SharedPreferences.getInstance();
-    _baseUrl = prefs.getString(_prefKey) ?? defaultPlatformUrl;
-    final envToken = defaultAuthToken.isNotEmpty ? defaultAuthToken : null;
-    final envRefresh = defaultRefreshToken.isNotEmpty
-        ? defaultRefreshToken
-        : null;
-    _authToken = prefs.getString(_tokenPrefKey) ?? envToken;
-    final refresh = prefs.getString(_refreshPrefKey) ?? envRefresh;
-    if (refresh != null && refresh.isNotEmpty) {
-      try {
-        final response = await http
-            .post(
-              Uri.parse('$_baseUrl/v1/auth/refresh'),
-              headers: {'Content-Type': 'application/json'},
-              body: jsonEncode({'refresh_token': refresh}),
-            )
-            .timeout(const Duration(seconds: 8));
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body) as Map<String, dynamic>;
-          final access = data['access_token'] as String;
-          final nextRefresh = data['refresh_token'] as String;
-          await prefs.setString(_tokenPrefKey, access);
-          await prefs.setString(_refreshPrefKey, nextRefresh);
-          _authToken = access;
-        }
-      } catch (_) {
-        // Offline startup retains the current session for a later connection.
+    for (final key in [
+      'backend_base_url',
+      'backend_auth_token',
+      'backend_refresh_token',
+    ]) {
+      await prefs.remove(key);
+    }
+    sessions.onDisconnect = _clearLocalAccess;
+    await sessions.init();
+  }
+
+  Future<void> _clearLocalAccess() async {
+    _client.close();
+    for (final client in _activeClients.toList()) {
+      client.close();
+    }
+    _activeClients.clear();
+    _client = SpaceHttpClient(sessions);
+    _testToken = null;
+    _testBaseUrl = null;
+    final temporary = await getTemporaryDirectory();
+    await for (final entity in temporary.list()) {
+      if (entity is Directory &&
+          entity.path.split('/').last.startsWith('agenda-')) {
+        try {
+          await entity.delete(recursive: true);
+        } catch (_) {}
       }
     }
   }
 
-  Future<void> setBaseUrl(String url) async {
-    _baseUrl = url.replaceAll(RegExp(r'/+$'), '');
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefKey, _baseUrl);
+  /// Ephemeral test hook; production sessions are only granted by activation.
+  @visibleForTesting
+  Future<void> setAuthToken(String? token) async {
+    if (kReleaseMode) throw StateError('Use activation to connect.');
+    _testToken = token;
+    _client.close();
+    _client = token == null ? SpaceHttpClient(sessions) : http.Client();
   }
 
-  Future<void> setAuthToken(String? token) async {
-    _authToken = token;
-    final prefs = await SharedPreferences.getInstance();
-    if (token != null) {
-      await prefs.setString(_tokenPrefKey, token);
-    } else {
-      await prefs.remove(_tokenPrefKey);
+  @visibleForTesting
+  Future<void> setBaseUrl(String url) async {
+    if (kReleaseMode || sessions.session != null) {
+      throw StateError('Use activation to change space.');
     }
+    _testBaseUrl = url.replaceAll(RegExp(r'/+$'), '');
+  }
+
+  http.Client _operationClient() {
+    final client = _testToken == null
+        ? SpaceHttpClient(sessions)
+        : http.Client();
+    _activeClients.add(client);
+    return client;
   }
 
   Future<List<Map<String, dynamic>>> getWeeklyRoutines() async {
-    final response = await http
-        .get(Uri.parse('$_baseUrl/v1/agenda/routines'), headers: _headers)
+    final response = await _client
+        .get(Uri.parse('$baseUrl/v1/agenda/routines'), headers: _headers)
         .timeout(const Duration(seconds: 15));
     if (response.statusCode != 200) {
       throw Exception('No se pudieron cargar las rutinas');
@@ -128,10 +131,10 @@ class ApiClient {
   }
 
   Future<void> setWeeklyRoutineEnabled(String id, bool enabled) async {
-    final response = await http
+    final response = await _client
         .put(
           Uri.parse(
-            '$_baseUrl/v1/agenda/routines/${Uri.encodeComponent(id)}/enabled',
+            '$baseUrl/v1/agenda/routines/${Uri.encodeComponent(id)}/enabled',
           ),
           headers: _headers,
           body: jsonEncode({'enabled': enabled}),
@@ -148,7 +151,7 @@ class ApiClient {
     String query = '',
     int offset = 0,
   }) async {
-    final uri = Uri.parse('$_baseUrl/v1/documents').replace(
+    final uri = Uri.parse('$baseUrl/v1/documents').replace(
       queryParameters: {
         'q': query,
         'offset': '$offset',
@@ -156,7 +159,7 @@ class ApiClient {
         'include_text': 'false',
       },
     );
-    final response = await http
+    final response = await _client
         .get(uri, headers: _headers)
         .timeout(const Duration(seconds: 15));
     _requireSuccess(response);
@@ -165,9 +168,9 @@ class ApiClient {
   }
 
   Future<void> deleteDocument(String id) async {
-    final response = await http
+    final response = await _client
         .delete(
-          Uri.parse('$_baseUrl/v1/documents/${Uri.encodeComponent(id)}'),
+          Uri.parse('$baseUrl/v1/documents/${Uri.encodeComponent(id)}'),
           headers: _headers,
         )
         .timeout(const Duration(seconds: 15));
@@ -191,9 +194,9 @@ class ApiClient {
     if (file.size <= 0 || file.size > maxFileBytes) {
       throw Exception('Selecciona un archivo de entre 1 byte y 50 MB.');
     }
-    final response = await http
+    final response = await _client
         .post(
-          Uri.parse('$_baseUrl/v1/documents/uploads'),
+          Uri.parse('$baseUrl/v1/documents/uploads'),
           headers: _headers,
           body: jsonEncode({
             'filename': file.name,
@@ -215,12 +218,12 @@ class ApiClient {
     final request =
         http.StreamedRequest(
             'PUT',
-            Uri.parse('$_baseUrl/v1/documents/uploads/$id/content'),
+            Uri.parse('$baseUrl/v1/documents/uploads/$id/content'),
           )
           ..headers.addAll(_headers)
           ..headers['Content-Type'] = 'application/octet-stream'
           ..contentLength = file.size;
-    final client = http.Client();
+    final client = _operationClient();
     try {
       final responseFuture = client
           .send(request)
@@ -243,11 +246,12 @@ class ApiClient {
       final uploaded = results.first as http.Response;
       _requireSuccess(uploaded);
     } finally {
+      _activeClients.remove(client);
       client.close();
     }
-    final complete = await http
+    final complete = await _client
         .post(
-          Uri.parse('$_baseUrl/v1/documents/uploads/$id/complete'),
+          Uri.parse('$baseUrl/v1/documents/uploads/$id/complete'),
           headers: _headers,
         )
         .timeout(const Duration(seconds: 60));
@@ -261,11 +265,11 @@ class ApiClient {
         .hasMatch(route)) {
       throw Exception('Enlace de archivo no válido.');
     }
-    final client = http.Client();
+    final client = _operationClient();
     Directory? directory;
     var complete = false;
     try {
-      final request = http.Request('GET', Uri.parse('$_baseUrl$route'))
+      final request = http.Request('GET', Uri.parse('$baseUrl$route'))
         ..headers.addAll(_headers)
         ..followRedirects = false;
       final response = await client
@@ -309,6 +313,7 @@ class ApiClient {
       complete = true;
       return file;
     } finally {
+      _activeClients.remove(client);
       client.close();
       if (!complete && directory != null) {
         await directory.delete(recursive: true);
@@ -319,8 +324,8 @@ class ApiClient {
   /// Verifica el estado de salud del servidor backend.
   Future<bool> checkHealth() async {
     try {
-      final uri = Uri.parse('$_baseUrl/health');
-      final response = await http
+      final uri = Uri.parse('$baseUrl/health');
+      final response = await _client
           .get(uri, headers: _headers)
           .timeout(const Duration(seconds: 4));
       return response.statusCode == 200;
@@ -337,20 +342,25 @@ class ApiClient {
   Future<List<AgendaItem>> getEvents({DateTime? date}) async {
     final targetDate = date ?? DateTime.now();
     final dateStr = DateFormat('yyyy-MM-dd').format(targetDate);
-    final uri = Uri.parse('$_baseUrl/v1/agenda/events?date=$dateStr');
+    final uri = Uri.parse('$baseUrl/v1/agenda/events?date=$dateStr');
 
     try {
-      final response = await http
+      final response = await _client
           .get(uri, headers: _headers)
           .timeout(const Duration(seconds: 8));
+      _requireSuccess(response);
       if (response.statusCode == 200) {
         final List<dynamic> list = jsonDecode(response.body);
         return list
             .map((e) => AgendaItem.fromJson(e as Map<String, dynamic>))
             .toList();
       }
-    } catch (_) {}
-    return [];
+    } catch (error) {
+      if (error is ConnectionException) rethrow;
+    }
+    throw const ConnectionException(
+      'No se pudo cargar el contenido. Revisa tu conexión.',
+    );
   }
 
   /// Dates are local; end is exclusive. Surface failures instead of an empty agenda.
@@ -358,7 +368,7 @@ class ApiClient {
     required DateTime start,
     required DateTime end,
   }) async {
-    final uri = Uri.parse('$_baseUrl/v1/agenda/events').replace(
+    final uri = Uri.parse('$baseUrl/v1/agenda/events').replace(
       queryParameters: {
         'start_date': DateFormat('yyyy-MM-dd').format(start),
         'end_date': DateFormat('yyyy-MM-dd')
@@ -366,12 +376,10 @@ class ApiClient {
         'timezone': 'America/Mexico_City',
       },
     );
-    final response = await http
+    final response = await _client
         .get(uri, headers: _headers)
         .timeout(const Duration(seconds: 12));
-    if (response.statusCode != 200) {
-      throw Exception('No se pudo cargar el horario (${response.statusCode}).');
-    }
+    _requireSuccess(response);
     return (jsonDecode(response.body) as List<dynamic>)
         .map((e) => AgendaItem.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -383,9 +391,9 @@ class ApiClient {
     required DateTime observedAt,
   }) async {
     try {
-      final response = await http
+      final response = await _client
           .post(
-            Uri.parse('$_baseUrl/v1/agenda/check-ins'),
+            Uri.parse('$baseUrl/v1/agenda/check-ins'),
             headers: _headers,
             body: jsonEncode({
               'request_id': requestId,
@@ -402,9 +410,9 @@ class ApiClient {
 
   /// Crea o actualiza un evento en la agenda canónica.
   Future<AgendaItem?> createOrUpdateEvent(AgendaItem item) async {
-    final uri = Uri.parse('$_baseUrl/v1/agenda/events');
+    final uri = Uri.parse('$baseUrl/v1/agenda/events');
     try {
-      final response = await http
+      final response = await _client
           .post(uri, headers: _headers, body: jsonEncode(item.toJson()))
           .timeout(const Duration(seconds: 8));
 
@@ -418,9 +426,9 @@ class ApiClient {
 
   /// Elimina un evento de la agenda canónica.
   Future<bool> deleteEvent(String eventId) async {
-    final uri = Uri.parse('$_baseUrl/v1/agenda/events/$eventId');
+    final uri = Uri.parse('$baseUrl/v1/agenda/events/$eventId');
     try {
-      final response = await http
+      final response = await _client
           .delete(uri, headers: _headers)
           .timeout(const Duration(seconds: 6));
       return response.statusCode == 200;
@@ -434,11 +442,11 @@ class ApiClient {
     final targetDate = date ?? DateTime.now();
     final dateStr = DateFormat('yyyy-MM-dd').format(targetDate);
     final uri = Uri.parse(
-      '$_baseUrl/v1/agenda/events/$eventId/toggle?date=$dateStr',
+      '$baseUrl/v1/agenda/events/$eventId/toggle?date=$dateStr',
     );
 
     try {
-      final response = await http
+      final response = await _client
           .post(uri, headers: _headers)
           .timeout(const Duration(seconds: 6));
       return response.statusCode == 200;
@@ -454,27 +462,32 @@ class ApiClient {
   /// Consulta la lista de tareas (status: 'pending', 'completed', 'all').
   Future<List<AgendaTask>> getTasks({String? status}) async {
     final query = status != null ? '?status=$status' : '';
-    final uri = Uri.parse('$_baseUrl/v1/agenda/tasks$query');
+    final uri = Uri.parse('$baseUrl/v1/agenda/tasks$query');
 
     try {
-      final response = await http
+      final response = await _client
           .get(uri, headers: _headers)
           .timeout(const Duration(seconds: 8));
+      _requireSuccess(response);
       if (response.statusCode == 200) {
         final List<dynamic> list = jsonDecode(response.body);
         return list
             .map((e) => AgendaTask.fromJson(e as Map<String, dynamic>))
             .toList();
       }
-    } catch (_) {}
-    return [];
+    } catch (error) {
+      if (error is ConnectionException) rethrow;
+    }
+    throw const ConnectionException(
+      'No se pudo cargar el contenido. Revisa tu conexión.',
+    );
   }
 
   /// Conmuta el estado de una tarea entre pendiente y completada.
   Future<bool> toggleTask(String taskId) async {
-    final uri = Uri.parse('$_baseUrl/v1/agenda/tasks/$taskId/toggle');
+    final uri = Uri.parse('$baseUrl/v1/agenda/tasks/$taskId/toggle');
     try {
-      final response = await http
+      final response = await _client
           .post(uri, headers: _headers)
           .timeout(const Duration(seconds: 6));
       return response.statusCode == 200;
@@ -489,9 +502,9 @@ class ApiClient {
 
   /// Recupera la propuesta pendiente más reciente generada por el agente.
   Future<AgentProposal?> getPendingProposal() async {
-    final uri = Uri.parse('$_baseUrl/v1/proposals/pending');
+    final uri = Uri.parse('$baseUrl/v1/proposals/pending');
     try {
-      final response = await http
+      final response = await _client
           .get(uri, headers: _headers)
           .timeout(const Duration(seconds: 6));
       if (response.statusCode == 200 && response.body != 'null') {
@@ -504,9 +517,9 @@ class ApiClient {
 
   /// Recupera los detalles de una propuesta específica por su identificador.
   Future<AgentProposal?> getProposal(String proposalId) async {
-    final uri = Uri.parse('$_baseUrl/v1/proposals/$proposalId');
+    final uri = Uri.parse('$baseUrl/v1/proposals/$proposalId');
     try {
-      final response = await http
+      final response = await _client
           .get(uri, headers: _headers)
           .timeout(const Duration(seconds: 6));
       if (response.statusCode == 200) {
@@ -519,9 +532,9 @@ class ApiClient {
 
   /// Confirma y aplica atómicamente una propuesta en la agenda.
   Future<bool> confirmProposal(String proposalId) async {
-    final uri = Uri.parse('$_baseUrl/v1/proposals/$proposalId/confirm');
+    final uri = Uri.parse('$baseUrl/v1/proposals/$proposalId/confirm');
     try {
-      final response = await http
+      final response = await _client
           .post(uri, headers: _headers)
           .timeout(const Duration(seconds: 8));
       if (response.statusCode != 200) return false;
@@ -534,9 +547,9 @@ class ApiClient {
 
   /// Descarta una propuesta del agente.
   Future<bool> rejectProposal(String proposalId) async {
-    final uri = Uri.parse('$_baseUrl/v1/proposals/$proposalId/reject');
+    final uri = Uri.parse('$baseUrl/v1/proposals/$proposalId/reject');
     try {
-      final response = await http
+      final response = await _client
           .post(uri, headers: _headers)
           .timeout(const Duration(seconds: 8));
       if (response.statusCode != 200) return false;
@@ -553,31 +566,36 @@ class ApiClient {
 
   /// Recupera el historial de mensajes persistentes del chat durable.
   Future<List<Map<String, dynamic>>> getChatMessages({int limit = 50}) async {
-    final uri = Uri.parse('$_baseUrl/v1/chat/messages?limit=$limit');
+    final uri = Uri.parse('$baseUrl/v1/chat/messages?limit=$limit');
     try {
-      final response = await http
+      final response = await _client
           .get(uri, headers: _headers)
           .timeout(const Duration(seconds: 8));
+      _requireSuccess(response);
       if (response.statusCode == 200) {
         final List<dynamic> list = jsonDecode(response.body);
         return list.cast<Map<String, dynamic>>();
       }
-    } catch (_) {}
-    return [];
+    } catch (error) {
+      if (error is ConnectionException) rethrow;
+    }
+    throw const ConnectionException(
+      'No se pudo cargar el contenido. Revisa tu conexión.',
+    );
   }
 
   Future<Map<String, dynamic>> getChatWindow({
     DateTime? before,
     String? cursor,
   }) async {
-    final uri = Uri.parse('$_baseUrl/v1/chat/history').replace(
+    final uri = Uri.parse('$baseUrl/v1/chat/history').replace(
       queryParameters: {
         if (before != null) 'before': before.toUtc().toIso8601String(),
         'cursor': ?cursor,
         'limit': '60',
       },
     );
-    final response = await http
+    final response = await _client
         .get(uri, headers: _headers)
         .timeout(const Duration(seconds: 15));
     _requireSuccess(response);
@@ -587,9 +605,9 @@ class ApiClient {
   Future<Map<String, dynamic>> openCheckIn(
     Map<String, dynamic> notification,
   ) async {
-    final response = await http
+    final response = await _client
         .post(
-          Uri.parse('$_baseUrl/v1/chat/check-ins'),
+          Uri.parse('$baseUrl/v1/chat/check-ins'),
           headers: _headers,
           body: jsonEncode(notification),
         )
@@ -606,7 +624,7 @@ class ApiClient {
   }) async* {
     final targetDate = date ?? DateTime.now();
     final dateStr = DateFormat('yyyy-MM-dd').format(targetDate);
-    final uri = Uri.parse('$_baseUrl/v1/chat/stream');
+    final uri = Uri.parse('$baseUrl/v1/chat/stream');
 
     final body = jsonEncode({
       'message': message,
@@ -619,11 +637,12 @@ class ApiClient {
       ..headers['Accept'] = 'text/event-stream'
       ..body = body;
 
-    final client = http.Client();
+    final client = _operationClient();
     http.StreamedResponse response;
     try {
       response = await client.send(request).timeout(const Duration(seconds: 8));
     } catch (_) {
+      _activeClients.remove(client);
       client.close();
       yield const ChatErrorEvent(
         'Error de conexión: no se pudo alcanzar el backend.',
@@ -632,6 +651,7 @@ class ApiClient {
     }
 
     if (response.statusCode != 200) {
+      _activeClients.remove(client);
       client.close();
       yield ChatErrorEvent(
         'Servidor respondió con código ${response.statusCode}',
@@ -679,6 +699,7 @@ class ApiClient {
     } catch (_) {
       yield const ChatErrorEvent('Se perdió la conexión durante la respuesta.');
     } finally {
+      _activeClients.remove(client);
       client.close();
     }
   }

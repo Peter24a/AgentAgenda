@@ -23,6 +23,7 @@ abstract class LocalNotificationDriver {
 }
 
 class AndroidLocalNotificationDriver implements LocalNotificationDriver {
+  String spaceKey = '';
   final _plugin = FlutterLocalNotificationsPlugin();
   AndroidFlutterLocalNotificationsPlugin? get _android => _plugin
       .resolvePlatformSpecificImplementation<
@@ -88,6 +89,7 @@ class AndroidLocalNotificationDriver implements LocalNotificationDriver {
         ? DateTimeComponents.time
         : null,
     payload: jsonEncode({
+      'space_key': spaceKey,
       'kind': reminder.kind,
       'event_id': reminder.eventId.isEmpty ? null : reminder.eventId,
       'notification_key': reminder.key,
@@ -111,7 +113,7 @@ typedef FollowUpLoader = Future<List<AgendaItem>> Function(
 );
 
 class FollowUpService extends ChangeNotifier {
-  static final instance = FollowUpService();
+  static final instance = FollowUpService(namespace: 'disconnected');
   static const settingsKey = 'follow_up_settings_v1';
   static const cacheKey = 'follow_up_event_cache_v1';
   static const syncedKey = 'follow_up_synced_at_v1';
@@ -135,12 +137,16 @@ class FollowUpService extends ChangeNotifier {
   SharedPreferences? _prefs;
   Future<void>? _initializing;
   Future<void> _tail = Future.value();
+  String namespace;
+  int _scopeEpoch = 0;
+  String _key(String key) => namespace.isEmpty ? key : '$key::$namespace';
 
   FollowUpService({
     LocalNotificationDriver? driver,
     FollowUpLoader? loader,
     DateTime Function()? now,
     bool? supported,
+    this.namespace = '',
   }) : _driver = driver ?? AndroidLocalNotificationDriver(),
        _loader =
            loader ??
@@ -160,18 +166,21 @@ class FollowUpService extends ChangeNotifier {
     }
     try {
       _prefs = await SharedPreferences.getInstance();
-      final settingsJson = _prefs!.getString(settingsKey);
+      if (_driver is AndroidLocalNotificationDriver) {
+        _driver.spaceKey = namespace;
+      }
+      final settingsJson = _prefs!.getString(_key(settingsKey));
       if (settingsJson != null) {
         settings = FollowUpSettings.fromJson(jsonDecode(settingsJson));
       }
-      lastSynced = DateTime.tryParse(_prefs!.getString(syncedKey) ?? '');
-      final cacheJson = _prefs!.getString(cacheKey);
+      lastSynced = DateTime.tryParse(_prefs!.getString(_key(syncedKey)) ?? '');
+      final cacheJson = _prefs!.getString(_key(cacheKey));
       if (cacheJson != null) {
         _cache = (jsonDecode(cacheJson) as List)
             .map((e) => AgendaItem.fromJson(Map<String, dynamic>.from(e)))
             .toList();
       }
-      final scheduledJson = _prefs!.getString(scheduledKey);
+      final scheduledJson = _prefs!.getString(_key(scheduledKey));
       if (scheduledJson != null) {
         _scheduled = (jsonDecode(scheduledJson) as Map<String, dynamic>).map(
           (key, value) => MapEntry(int.parse(key), value as String),
@@ -181,6 +190,10 @@ class FollowUpService extends ChangeNotifier {
         if (payload == null) return;
         try {
           final value = Map<String, dynamic>.from(jsonDecode(payload) as Map);
+          if (namespace == 'disconnected' ||
+              (value['space_key'] ?? '') != namespace) {
+            return;
+          }
           if (['check_in', 'reminder', 'follow_up'].contains(value['kind'])) {
             final now = tz.TZDateTime.from(
               _now(),
@@ -213,7 +226,9 @@ class FollowUpService extends ChangeNotifier {
   }
 
   Future<void> _serial(Future<void> Function() operation) {
+    final epoch = _scopeEpoch;
     final task = _tail.then((_) async {
+      if (epoch != _scopeEpoch) return;
       await init();
       if (!supported || _prefs == null) return;
       busy = true;
@@ -233,7 +248,7 @@ class FollowUpService extends ChangeNotifier {
 
   Future<void> saveSettings(FollowUpSettings value) => _serial(() async {
     settings = value;
-    await _prefs!.setString(settingsKey, jsonEncode(settings.toJson()));
+    await _prefs!.setString(_key(settingsKey), jsonEncode(settings.toJson()));
     error = null;
     await _reconcile();
   });
@@ -256,6 +271,7 @@ class FollowUpService extends ChangeNotifier {
   });
 
   Future<void> synchronize() => _serial(() async {
+    final epoch = _scopeEpoch;
     if (!settings.enabled) {
       await _reconcile();
       return;
@@ -266,12 +282,17 @@ class FollowUpService extends ChangeNotifier {
     final end = tz.TZDateTime(now.location, now.year, now.month, now.day + 8);
     try {
       final canonical = await _loader(start, end);
+      if (epoch != _scopeEpoch) return;
       _cache = canonical;
       lastSynced = _now();
       await _persistCache();
-      await _prefs!.setString(syncedKey, lastSynced!.toUtc().toIso8601String());
+      await _prefs!.setString(
+        _key(syncedKey),
+        lastSynced!.toUtc().toIso8601String(),
+      );
       error = null;
     } catch (_) {
+      if (epoch != _scopeEpoch) return;
       error = 'Sin conexión con la agenda. Los avisos conservan la última sincronización; los cambios externos aún no llegaron.';
     }
     await _reconcile();
@@ -290,7 +311,7 @@ class FollowUpService extends ChangeNotifier {
 
   Future<void> _persistCache() => _prefs!
       .setString(
-        cacheKey,
+        _key(cacheKey),
         jsonEncode(
           _cache
               .map(
@@ -313,7 +334,7 @@ class FollowUpService extends ChangeNotifier {
     permissionGranted = await _driver.allowed();
     final freshEnough =
         lastSynced != null && _now().difference(lastSynced!).inDays < 7;
-    final next = permissionGranted
+    final next = permissionGranted && namespace != 'disconnected'
         ? planFollowUps(freshEnough ? _cache : [], settings, _now())
         : <PlannedFollowUp>[];
     final nextIds = next.map((n) => n.notificationId).toSet();
@@ -333,7 +354,7 @@ class FollowUpService extends ChangeNotifier {
     _scheduled = signatures;
     planned = next;
     await _prefs!.setString(
-      scheduledKey,
+      _key(scheduledKey),
       jsonEncode(_scheduled.map((id, value) => MapEntry(id.toString(), value))),
     );
   }
@@ -361,5 +382,46 @@ class FollowUpService extends ChangeNotifier {
     } catch (_) {
       return false;
     }
+  }
+
+  /// Serialized with reconciliation; an old loader cannot populate a new space.
+  Future<void> selectSpace(String newNamespace) async {
+    if (namespace == newNamespace) return;
+    _scopeEpoch++;
+    final task = _tail.then((_) async {
+      await init();
+      if (_prefs != null && supported) {
+        for (final id in {..._scheduled.keys, ...await _driver.pendingIds()}) {
+          await _driver.cancel(id);
+        }
+        for (final key in [cacheKey, syncedKey, scheduledKey]) {
+          await _prefs!.remove(_key(key));
+        }
+        // Pre-platform caches have no account identity. Discard them.
+        for (final key in [settingsKey, cacheKey, syncedKey, scheduledKey]) {
+          await _prefs!.remove(key);
+        }
+      }
+      namespace = newNamespace;
+      if (_driver is AndroidLocalNotificationDriver) {
+        _driver.spaceKey = namespace;
+      }
+      settings = const FollowUpSettings();
+      _cache = [];
+      _scheduled = {};
+      planned = [];
+      lastSynced = null;
+      openedNotification = null;
+      openCheckIn.value = false;
+      error = null;
+      final saved = _prefs?.getString(_key(settingsKey));
+      if (saved != null) {
+        settings = FollowUpSettings.fromJson(jsonDecode(saved));
+      }
+      if (_prefs != null && supported) await _reconcile();
+      notifyListeners();
+    });
+    _tail = task.catchError((Object _) {});
+    await task;
   }
 }

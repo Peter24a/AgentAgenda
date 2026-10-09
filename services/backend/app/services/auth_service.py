@@ -60,6 +60,9 @@ class AuthService:
         if not user_id:
             raise ValueError("Código de emparejamiento inválido, expirado o ya utilizado")
 
+        return await self.enroll_device(session, user_id, req)
+
+    async def enroll_device(self, session: AsyncSession, user_id: str, req: PairRequest, *, commit: bool = True) -> PairResponse:
         now = datetime.now(timezone.utc).replace(tzinfo=None)
 
         # Determinar si reutilizamos o creamos dispositivo
@@ -69,6 +72,9 @@ class AuthService:
                 select(Device).where(Device.id == req.client_device_id)
             )
             device = res.scalar_one_or_none()
+
+        if device and device.user_id != user_id:
+            raise ValueError("El dispositivo pertenece a otra identidad")
 
         if device:
             device.device_name = req.device_name
@@ -124,7 +130,8 @@ class AuthService:
         )
         session.add(refresh_token_record)
 
-        await session.commit()
+        if commit:
+            await session.commit()
 
         expires_in_seconds = int(settings.token_expire_days * 86400)
         return PairResponse(
@@ -162,7 +169,7 @@ class AuthService:
                 select(Device).where(Device.id == token.device_id)
             )
             device = dev_res.scalar_one_or_none()
-            if not device or not device.is_active:
+            if not device or not device.is_active or device.user_id != token.user_id:
                 raise ValueError("El dispositivo asociado ha sido desactivado o revocado")
             device.last_seen_at = now
 
@@ -216,21 +223,24 @@ class AuthService:
         session: AsyncSession,
         raw_token: Optional[str] = None,
         device_id: Optional[str] = None,
+        user_id: str = "default_user",
     ) -> Tuple[bool, str]:
         now = datetime.now(timezone.utc).replace(tzinfo=None)
 
         if device_id:
             dev_res = await session.execute(
-                select(Device).where(Device.id == device_id)
+                select(Device).where(Device.id == device_id, Device.user_id == user_id)
             )
             device = dev_res.scalar_one_or_none()
-            if device:
-                device.is_active = False
+            if not device:
+                return False, "Dispositivo no encontrado"
+            device.is_active = False
 
             await session.execute(
                 update(AuthToken)
                 .where(
                     AuthToken.device_id == device_id,
+                    AuthToken.user_id == user_id,
                     AuthToken.revoked_at.is_(None),
                 )
                 .values(revoked_at=now)
@@ -243,6 +253,7 @@ class AuthService:
             res = await session.execute(
                 select(AuthToken).where(
                     AuthToken.token_hash == h,
+                    AuthToken.user_id == user_id,
                     AuthToken.revoked_at.is_(None),
                 )
             )
@@ -278,8 +289,12 @@ class AuthService:
         if token.expires_at <= now:
             return None
 
+        # Refresh credentials can only be submitted to /auth/refresh, never used as access tokens.
+        if "refresh" in (token.scopes or []):
+            return None
+
         if device:
-            if not device.is_active:
+            if not device.is_active or device.user_id != token.user_id:
                 return None
             device.last_seen_at = now
             await session.commit()

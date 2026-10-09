@@ -4,6 +4,8 @@
 
 AgentAgenda conecta tus tareas y compromisos cotidianos con las personas, fechas y documentos que necesitas para cumplirlos. A través de una conversación fluida y natural, accesible desde tu dispositivo móvil (Android/Flutter) o mediante agentes externos conectados (FastMCP), AgentAgenda gestiona tu agenda diaria, preserva tus documentos privados y mantiene una memoria contextual persistente sin comprometer tu privacidad.
 
+El servicio por clientes utiliza un APK general y espacios privados activados mediante un código. La página, el panel administrativo y la API comparten `agenda-api.pedroibarra.dev`; cada espacio conserva su backend, base y documentos propios. La [guía operativa de multitenancy](docs/MULTITENANCY_OPERATIONS.md) documenta el despliegue actual, el cifrado, los respaldos y la recuperación.
+
 ---
 
 ## 🌟 Características Principales

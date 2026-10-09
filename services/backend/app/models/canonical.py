@@ -341,3 +341,14 @@ class WeeklyRoutine(Base):
     last_materialized_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class EnrollmentReceipt(Base):
+    __tablename__ = "enrollment_receipts"
+    operation_id = Column(String(128), primary_key=True)
+    user_id = Column(String(64), nullable=False)
+    device_id = Column(String(64), ForeignKey("devices.id"), nullable=False)
+    request_hash = Column(String(64), nullable=False)
+    response_ciphertext = Column(Text, nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    expires_at = Column(DateTime, nullable=False)

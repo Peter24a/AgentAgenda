@@ -4,7 +4,7 @@ import os
 import re
 import shutil
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, Tuple
 
 from sqlalchemy import func, select
@@ -26,16 +26,73 @@ class DocumentStorageService:
         os.makedirs(os.path.join(base, "documents"), exist_ok=True)
         os.makedirs(os.path.join(base, "temp"), exist_ok=True)
 
+    def storage_usage_bytes(self) -> int:
+        path = os.path.join(settings.storage_path, "documents")
+        total = 0
+        for root, _, names in os.walk(path):
+            for name in names:
+                try:
+                    total += os.path.getsize(os.path.join(root, name))
+                except FileNotFoundError:
+                    # A concurrent cleanup or file move does not make metrics fail.
+                    continue
+        return total
+
+    def _prune_upload_sessions(self):
+        """Bound temporary reservations; interrupted uploads cannot reserve quota forever."""
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        cutoff = now - timedelta(seconds=settings.upload_session_ttl_seconds)
+        current_temp = os.path.realpath(os.path.join(settings.storage_path, "temp"))
+        for upload_id, meta in list(self._sessions.items()):
+            same_storage = os.path.dirname(os.path.realpath(meta["temp_path"])) == current_temp
+            expired = meta["created_at"] <= cutoff
+            missing = meta["status"] in ("pending", "uploading") and not os.path.isfile(meta["temp_path"])
+            if not same_storage or expired or missing:
+                if same_storage and expired and os.path.isfile(meta["temp_path"]):
+                    os.remove(meta["temp_path"])
+                self._sessions.pop(upload_id, None)
+        # Upload metadata is process-local: orphan partial files count until their recovery window expires.
+        for filename in os.listdir(current_temp) if os.path.isdir(current_temp) else ():
+            if not filename.startswith("upl-") or not filename.endswith(".part"):
+                continue
+            path = os.path.join(current_temp, filename)
+            try:
+                if os.path.getmtime(path) <= cutoff.replace(tzinfo=timezone.utc).timestamp():
+                    os.remove(path)
+            except FileNotFoundError:
+                continue
+
+    def _reserved_upload_bytes(self) -> int:
+        active = [meta for meta in self._sessions.values() if meta["status"] in ("pending", "uploading")]
+        known_paths = {os.path.realpath(meta["temp_path"]) for meta in active}
+        reserved = sum(meta["expected_size_bytes"] for meta in active)
+        temp_dir = os.path.join(settings.storage_path, "temp")
+        for root, _, names in os.walk(temp_dir):
+            for filename in names:
+                path = os.path.join(root, filename)
+                if os.path.realpath(path) in known_paths:
+                    continue
+                try:
+                    reserved += os.path.getsize(path)
+                except FileNotFoundError:
+                    continue
+        return reserved
+
     def start_upload_session(
         self, user_id: str, req: UploadInitRequest
     ) -> UploadSessionResponse:
         self._ensure_storage_dirs()
+        self._prune_upload_sessions()
 
         if req.expected_size_bytes > settings.max_upload_size_bytes:
             raise ValueError(
                 f"El tamaño del archivo ({req.expected_size_bytes} bytes) excede el límite permitido "
                 f"de {settings.max_upload_size_bytes} bytes"
             )
+
+        reserved = self._reserved_upload_bytes()
+        if self.storage_usage_bytes() + reserved + req.expected_size_bytes > settings.storage_quota_bytes:
+            raise ValueError("El espacio alcanzó su cuota de documentos")
 
         upload_id = f"upl-{uuid.uuid4().hex[:12]}"
         now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -78,6 +135,7 @@ class DocumentStorageService:
     async def append_chunk(
         self, upload_id: str, user_id: str, chunk: bytes
     ) -> int:
+        self._prune_upload_sessions()
         session = self._sessions.get(upload_id)
         if not session or session["user_id"] != user_id:
             raise ValueError("Sesión de carga no encontrada o no autorizada")
@@ -85,6 +143,11 @@ class DocumentStorageService:
         if session["status"] not in ("pending", "uploading"):
             raise ValueError(f"No se pueden subir bytes en estado '{session['status']}'")
 
+        if session["uploaded_bytes"] + len(chunk) > session["expected_size_bytes"]:
+            session["status"] = "aborted"
+            if os.path.exists(session["temp_path"]):
+                os.remove(session["temp_path"])
+            raise ValueError("Los bytes enviados exceden el tamaño reservado")
         temp_path = session["temp_path"]
         with open(temp_path, "ab") as f:
             f.write(chunk)
@@ -103,6 +166,7 @@ class DocumentStorageService:
     def get_upload_session(
         self, upload_id: str, user_id: str
     ) -> Optional[UploadSessionResponse]:
+        self._prune_upload_sessions()
         session = self._sessions.get(upload_id)
         if not session or session["user_id"] != user_id:
             return None
@@ -118,6 +182,7 @@ class DocumentStorageService:
     async def complete_upload(
         self, session_db: AsyncSession, upload_id: str, user_id: str
     ) -> Tuple[Document, DocumentRevision]:
+        self._prune_upload_sessions()
         session = self._sessions.get(upload_id)
         if not session or session["user_id"] != user_id:
             raise ValueError("Sesión de carga no encontrada o no autorizada")

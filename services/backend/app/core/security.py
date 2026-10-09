@@ -47,7 +47,6 @@ def verify_and_consume_challenge(code: str) -> Optional[str]:
     """Verifica y consume un código de desafío de un solo uso.
     
     Retorna el user_id si es válido, o None si expiró, ya fue usado o no existe.
-    En entorno de desarrollo o pruebas, también acepta la clave secreta maestra.
     """
     cleaned = code.strip().upper()
     now = datetime.now(timezone.utc)
@@ -66,9 +65,5 @@ def verify_and_consume_challenge(code: str) -> Optional[str]:
         user_id = challenge["user_id"]
         _pairing_challenges.pop(cleaned, None)
         return user_id
-
-    # Aceptar clave secreta maestra configurada (modo admin/setup)
-    if settings.secret_key and cleaned == settings.secret_key.strip().upper():
-        return "default_user"
 
     return None

@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     storage_path: str = os.getenv("STORAGE_PATH", "./storage")
     max_upload_size_bytes: int = int(os.getenv("MAX_UPLOAD_SIZE_BYTES", str(100 * 1024 * 1024)))  # 100 MB
 
+    storage_quota_bytes: int = 5 * 1024 ** 3
+    upload_session_ttl_seconds: int = 86400
+
     # LLM server config (llama-server local)
     llm_api_base: str = os.getenv("LLM_API_BASE", "http://127.0.0.1:8080/v1")
     llm_api_key: SecretStr = SecretStr(os.getenv("LLM_API_KEY", ""))
@@ -40,6 +43,9 @@ class Settings(BaseSettings):
     token_expire_days: int = int(os.getenv("TOKEN_EXPIRE_DAYS", "30"))
     pairing_challenge_ttl_minutes: int = int(os.getenv("PAIRING_CHALLENGE_TTL_MINUTES", "10"))
     
+    platform_enrollment_key: SecretStr = SecretStr(os.getenv("PLATFORM_ENROLLMENT_KEY", ""))
+    seed_demo_data: bool = False
+
     # Fallback seguro para uso personal (Opción A vs Opción B)
     # Permite acceso directo transparente solo desde red local / privada sin exponer a internet público
     allow_anonymous_fallback: bool = os.getenv("ALLOW_ANONYMOUS_FALLBACK", "false").lower() in ("true", "1", "yes")

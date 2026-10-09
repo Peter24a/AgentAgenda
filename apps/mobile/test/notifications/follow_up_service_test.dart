@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:agent_agenda/core/notifications/follow_up_plan.dart';
@@ -170,4 +172,71 @@ void main() {
     expect(driver.testCalls, 1);
     expect(service.settings.enabled, false);
   });
+
+  test(
+    'Changing space cancels all notices and removes the old private cache',
+    () async {
+      final driver = FakeNotifications();
+      final service = FollowUpService(
+        driver: driver,
+        now: () => now,
+        supported: true,
+        namespace: 'personal',
+        loader: (_, _) async => [event],
+      );
+      await service.enableFromUserAction();
+      expect(driver.notices, isNotEmpty);
+      final prefs = await SharedPreferences.getInstance();
+      expect(
+        prefs.getString('${FollowUpService.cacheKey}::personal'),
+        contains(event.title),
+      );
+      await service.selectSpace('walter');
+      expect(driver.notices, isEmpty);
+      expect(service.settings.enabled, false);
+      expect(service.planned, isEmpty);
+      expect(service.lastSynced, isNull);
+      expect(prefs.getString('${FollowUpService.cacheKey}::personal'), isNull);
+      expect(prefs.getString('${FollowUpService.cacheKey}::walter'), isNull);
+      expect(
+        prefs.getString('${FollowUpService.settingsKey}::personal'),
+        isNotNull,
+      );
+      await service.selectSpace('personal');
+      expect(service.settings.enabled, true);
+    },
+  );
+
+  test(
+    'A synchronization from the old space cannot populate the new cache',
+    () async {
+      final driver = FakeNotifications();
+      final delayed = Completer<List<AgendaItem>>();
+      final started = Completer<void>();
+      var delay = false;
+      final service = FollowUpService(
+        driver: driver,
+        now: () => now,
+        supported: true,
+        namespace: 'personal',
+        loader: (_, _) async {
+          if (!delay) return [event];
+          started.complete();
+          return delayed.future;
+        },
+      );
+      await service.enableFromUserAction();
+      delay = true;
+      final sync = service.synchronize();
+      await started.future;
+      final switching = service.selectSpace('walter');
+      delayed.complete([event]);
+      await sync;
+      await switching;
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('${FollowUpService.cacheKey}::walter'), isNull);
+      expect(driver.notices, isEmpty);
+      expect(service.lastSynced, isNull);
+    },
+  );
 }

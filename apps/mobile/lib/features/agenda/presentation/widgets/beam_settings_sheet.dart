@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/space_session.dart' as session;
 import '../../../../core/theme/beam_color_notifier.dart';
 import '../../../../core/theme/color_schemes.dart';
 
@@ -13,46 +15,26 @@ class BeamSettingsSheet extends StatefulWidget {
 }
 
 class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
-  late final TextEditingController _serverController;
   bool _testingConnection = false;
   String? _connectionStatus;
   bool? _connectionSuccess;
 
-  @override
-  void initState() {
-    super.initState();
-    _serverController = TextEditingController(text: ApiClient.instance.baseUrl);
-  }
-
-  @override
-  void dispose() {
-    _serverController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _testAndSaveServer() async {
-    final url = _serverController.text.trim();
-    if (url.isEmpty) return;
-
+  Future<void> _testConnection() async {
     setState(() {
       _testingConnection = true;
       _connectionStatus = null;
-      _connectionSuccess = null;
     });
-
-    await ApiClient.instance.setBaseUrl(url);
-    final isHealthy = await ApiClient.instance.checkHealth();
-    final events = await ApiClient.instance.getEvents();
-
-    if (mounted) {
-      setState(() {
-        _testingConnection = false;
-        _connectionSuccess = isHealthy;
-        _connectionStatus = isHealthy
-            ? '✓ Conexión establecida (${events.length} actividades disponibles)'
-            : '✗ No se pudo alcanzar el servidor en esta dirección';
-      });
-    }
+    await ApiClient.instance.sessions.verify();
+    if (!mounted) return;
+    final connected =
+        ApiClient.instance.sessions.state == session.ConnectionState.connected;
+    setState(() {
+      _testingConnection = false;
+      _connectionSuccess = connected;
+      _connectionStatus = connected
+          ? 'Espacio y dispositivo verificados'
+          : ApiClient.instance.sessions.message;
+    });
   }
 
   @override
@@ -84,7 +66,7 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
               Icon(Icons.tune_rounded, size: 22, color: colorScheme.primary),
               const SizedBox(width: 10),
               Text(
-                'Ajustes de SARA Agenda',
+                'Ajustes de AgentAgenda',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: colorScheme.onSurface,
@@ -107,10 +89,7 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
             decoration: BoxDecoration(
               color: colorScheme.secondaryContainer,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: colorScheme.outlineVariant,
-                width: 1.0,
-              ),
+              border: Border.all(color: colorScheme.outlineVariant, width: 1.0),
             ),
             child: Row(
               children: [
@@ -136,7 +115,9 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        isDark ? '#C5AED0 en modo oscuro' : '#6B4F73 en modo claro',
+                        isDark
+                            ? '#C5AED0 en modo oscuro'
+                            : '#6B4F73 en modo claro',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                           fontSize: 12,
@@ -155,7 +136,11 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
 
           Row(
             children: [
-              Icon(Icons.all_inclusive_rounded, size: 20, color: colorScheme.primary),
+              Icon(
+                Icons.all_inclusive_rounded,
+                size: 20,
+                color: colorScheme.primary,
+              ),
               const SizedBox(width: 10),
               Text(
                 'Lazo Perimetral (Analogía al Isotipo)',
@@ -257,7 +242,8 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
                                   size: 20,
                                 ),
                                 onTap: () =>
-                                    BeamColorConfig.currentPathStyle.value = style,
+                                    BeamColorConfig.currentPathStyle.value =
+                                        style,
                               ),
                             );
                           }).toList(),
@@ -283,7 +269,8 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
                             return ChoiceChip(
                               label: Text(opt.name),
                               selected: isSelected,
-                              onSelected: (_) => BeamColorConfig.currentOption.value = opt,
+                              onSelected: (_) =>
+                                  BeamColorConfig.currentOption.value = opt,
                               avatar: Container(
                                 width: 12,
                                 height: 12,
@@ -310,100 +297,44 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
           const Divider(height: 1),
           const SizedBox(height: 18),
 
-          Row(
-            children: [
-              const Icon(Icons.dns_rounded, size: 20),
-              const SizedBox(width: 10),
-              Text(
-                'Servidor Backend & API',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Dirección de la API en vivo o del entorno de desarrollo.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _serverController,
-                  decoration: InputDecoration(
-                    hintText: 'https://walteragenda.pedroibarra.dev',
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    filled: true,
-                    fillColor: colorScheme.surfaceContainerLow,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: colorScheme.outline),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: colorScheme.outlineVariant),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: colorScheme.primary, width: 2),
-                    ),
-                  ),
-                  style: theme.textTheme.bodyMedium,
-                ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(
-                onPressed: _testingConnection ? null : _testAndSaveServer,
-                style: FilledButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  minimumSize: const Size(80, 48),
-                ),
-                child: _testingConnection
-                    ? SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: colorScheme.onPrimary,
-                        ),
-                      )
-                    : const Text('Guardar'),
-              ),
-            ],
-          ),
+          Text('Tu espacio', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
-
-          // Acceso rápido para restaurar servidor oficial en cite-server
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              ActionChip(
-                label: const Text('Servidor Walter (cite-server)'),
-                onPressed: () {
-                  _serverController.text = 'https://walteragenda.pedroibarra.dev';
-                  _testAndSaveServer();
-                },
-              ),
-              ActionChip(
-                label: const Text('Local (127.0.0.1:8001)'),
-                onPressed: () {
-                  _serverController.text = 'http://127.0.0.1:8001';
-                  _testAndSaveServer();
-                },
-              ),
-            ],
+          Text(
+            ApiClient.instance.sessions.session?.spaceName ?? 'Sin conectar',
+          ),
+          const SizedBox(height: 4),
+          Text(ApiClient.instance.baseUrl, style: theme.textTheme.bodySmall),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: _testingConnection ? null : _testConnection,
+            icon: const Icon(Icons.verified_user_outlined),
+            label: const Text('Verificar conexión y sesión'),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('¿Desconectar este teléfono?'),
+                  content: const Text(
+                    'Tu contenido permanece en el servidor. Necesitarás un código nuevo para volver a conectar este teléfono o cambiar de espacio.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancelar'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Desconectar'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed == true) await ApiClient.instance.sessions.logout();
+            },
+            icon: const Icon(Icons.logout_rounded),
+            label: const Text('Desconectar o cambiar de espacio'),
           ),
 
           if (_connectionStatus != null) ...[
@@ -412,8 +343,12 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: _connectionSuccess == true
-                    ? (isDark ? SaraColors.darkSuccessSoft : SaraColors.lightSuccessSoft)
-                    : (isDark ? SaraColors.darkErrorSoft : SaraColors.lightErrorSoft),
+                    ? (isDark
+                          ? SaraColors.darkSuccessSoft
+                          : SaraColors.lightSuccessSoft)
+                    : (isDark
+                          ? SaraColors.darkErrorSoft
+                          : SaraColors.lightErrorSoft),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -424,8 +359,12 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
                         : Icons.error_outline_rounded,
                     size: 16,
                     color: _connectionSuccess == true
-                        ? (isDark ? SaraColors.darkSuccess : SaraColors.lightSuccess)
-                        : (isDark ? SaraColors.darkError : SaraColors.lightError),
+                        ? (isDark
+                              ? SaraColors.darkSuccess
+                              : SaraColors.lightSuccess)
+                        : (isDark
+                              ? SaraColors.darkError
+                              : SaraColors.lightError),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -433,8 +372,12 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
                       _connectionStatus!,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: _connectionSuccess == true
-                            ? (isDark ? SaraColors.darkSuccess : SaraColors.lightSuccess)
-                            : (isDark ? SaraColors.darkError : SaraColors.lightError),
+                            ? (isDark
+                                  ? SaraColors.darkSuccess
+                                  : SaraColors.lightSuccess)
+                            : (isDark
+                                  ? SaraColors.darkError
+                                  : SaraColors.lightError),
                         fontWeight: FontWeight.w600,
                       ),
                     ),

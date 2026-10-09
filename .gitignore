@@ -31,3 +31,8 @@ storage/
 *.log
 .DS_Store
 .pytest_cache/
+
+# Private release signing material
+*.jks
+*.keystore
+apps/mobile/android/key.properties

@@ -2,7 +2,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_auth, get_db_session
+from app.api.deps import require_scope, get_db_session
 from app.models.auth import AuthContext
 from app.models.sync import (
     SyncBootstrapResponse,
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/v1", tags=["Sync Protocol"])
 )
 async def sync_bootstrap(
     session: AsyncSession = Depends(get_db_session),
-    auth: AuthContext = Depends(get_current_auth),
+    auth: AuthContext = Depends(require_scope("sync:read")),
 ):
     return await sync_service.get_bootstrap(session, auth.user_id)
 
@@ -40,7 +40,7 @@ async def sync_bootstrap(
 async def sync_push(
     req: SyncPushRequest,
     session: AsyncSession = Depends(get_db_session),
-    auth: AuthContext = Depends(get_current_auth),
+    auth: AuthContext = Depends(require_scope("sync:write")),
 ):
     return await sync_service.push_operations(
         session=session,
@@ -60,7 +60,7 @@ async def sync_pull(
     since_seq: int = Query(0, ge=0, description="Último commit_seq conocido por el cliente"),
     limit: int = Query(100, ge=1, le=500, description="Límite máximo de cambios por lote"),
     session: AsyncSession = Depends(get_db_session),
-    auth: AuthContext = Depends(get_current_auth),
+    auth: AuthContext = Depends(require_scope("sync:read")),
 ):
     return await sync_service.pull_changes(
         session=session,
@@ -79,7 +79,7 @@ async def sync_pull(
 async def sync_ack(
     req: SyncAckRequest,
     session: AsyncSession = Depends(get_db_session),
-    auth: AuthContext = Depends(get_current_auth),
+    auth: AuthContext = Depends(require_scope("sync:write")),
 ):
     return await sync_service.acknowledge(
         session=session,
@@ -97,7 +97,7 @@ async def sync_ack(
 async def get_operation_receipt(
     operation_id: str,
     session: AsyncSession = Depends(get_db_session),
-    auth: AuthContext = Depends(get_current_auth),
+    auth: AuthContext = Depends(require_scope("sync:read")),
 ):
     receipt = await sync_service.get_operation_receipt(
         session=session,
