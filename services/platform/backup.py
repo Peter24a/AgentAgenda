@@ -52,10 +52,15 @@ def main():
                 lock.close()
         with sqlite3.connect(root/"control"/"platform.sqlite3") as original, sqlite3.connect(work/"platform.sqlite3") as copy:
             original.backup(copy)
+        allocations = root/"runtime"/"ports.json"
+        if allocations.exists():
+            shutil.copyfile(allocations, work/"ports.json")
         archive = work/"backup.tar"
         with tarfile.open(archive,"w") as tar:
             tar.add(work/"spaces",arcname="spaces")
             tar.add(work/"platform.sqlite3",arcname="platform.sqlite3")
+            if (work/"ports.json").exists():
+                tar.add(work/"ports.json",arcname="ports.json")
         recipient = run("age-keygen","-y","/etc/agentagenda/backup.agekey").decode().strip()
         final = backup_root/("agentagenda-"+stamp+".tar.age")
         run("age","-r",recipient,"-o",str(final),str(archive))

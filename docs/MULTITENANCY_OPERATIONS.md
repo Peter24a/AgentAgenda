@@ -129,7 +129,7 @@ sudo systemctl status agentagenda-backup.timer
 1. Adquiere el bloqueo del espacio y registra qué contenedores estaban activos.
 2. Detiene brevemente backend y worker, manteniendo una base disponible para generar `pg_dump -Fc`.
 3. Copia la bóveda y el runtime del espacio junto al dump; restaura el estado de ejecución anterior al terminar.
-4. Obtiene una copia consistente del registro SQLite mediante su API de respaldo.
+4. Obtiene una copia consistente del registro SQLite mediante su API de respaldo y conserva la asignación global `ports.json`.
 5. Empaqueta las copias y cifra el archivo con `age` antes de escribirlo fuera del montaje.
 6. Descifra en memoria para comprobar la integridad del archivo y retira archivos de respaldo con más de treinta días.
 
@@ -161,6 +161,8 @@ Se verificaron respaldos previos y restauraciones de prueba de ambas bases. El i
 | Revisiones | 127 | 0 |
 | Mensajes | 50 | 0 |
 | Permisos documentales | 34 | — |
+
+La copia simultánea con suspensión y reactivación se verificó contra el servicio público; el mismo dispositivo volvió a autenticarse después del respaldo. Se retiraron los tres espacios sintéticos al terminar. El túnel propio de Walter está detenido y su reinicio automático deshabilitado; eliminar su registro DNS requiere la confirmación final en el navegador.
 
 La validación de código completó 204 pruebas del backend, 11 de plataforma, 36 de Flutter y 5 de utilidades web. La prueba pública con espacios sintéticos comprobó activación, identidad, aislamiento, descargas, chat SSE, creación, suspensión, reactivación y reapertura, incluyendo asignación de puertos nuevos. El estado definitivo del retiro del hostname anterior de Walter se registra en el resultado del corte; su base y bóveda no se eliminan por retirar DNS.
 
