@@ -1,0 +1,21 @@
+{
+  "identity_version": "0.4.0",
+  "sources": [
+    {
+      "file": "sara_isotipo_blanco.svg",
+      "sha256": "655671012724c8e06a149ad222f98b40ee75c71cdab168f8bf5bc65a9f695209",
+      "source": "Propuesta-Identidad-SARA/logos-svg/sara_isotipo_blanco.svg"
+    },
+    {
+      "file": "sara_isotipo_morado_claro.svg",
+      "sha256": "bf9555f96c144082cb236aa4de360a8e25ef54d77de602f8502a25c6edc2575f",
+      "source": "Propuesta-Identidad-SARA/logos-svg/sara_isotipo_morado_claro.svg"
+    },
+    {
+      "file": "sara_app_icon_morado.svg",
+      "sha256": "97ae5bde37983fedff71a25b4dd65876f1b15a0f2139de6fd1438a29c7626d70",
+      "source": "Propuesta-Identidad-SARA/logos-svg/sara_app_icon_morado.svg"
+    }
+  ],
+  "policy": "Official symbol geometry preserved without redrawing. Store/platform containers may be adapted to each platform mask and safe zone."
+}

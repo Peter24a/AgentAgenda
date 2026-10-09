@@ -1,19 +1,19 @@
 {
-  "verified_at": "2026-10-08T22:44:09.686054-06:00",
+  "verified_at": "2026-10-09T00:53:53.798818-06:00",
   "artifacts": [
     {
       "type": "AAB",
       "path": "apps/mobile/build/app/outputs/bundle/release/app-release.aab",
-      "bytes": 61396790,
-      "sha256": "baad0eed63e2ee9d114f33860f018d21c49b331d5c4acc0aec25809762737d66",
-      "distribution_copy": "distribution/google-play/release/AgentAgenda-2.0.1+8.aab"
+      "bytes": 61439778,
+      "sha256": "8037f08e4a2b1b9e93ce3c7c54a57af2b2f2d6643a79b4b9cd27be22d3ae631f",
+      "distribution_copy": "distribution/google-play/release/AgentAgenda-2.0.2+9.aab"
     },
     {
       "type": "APK",
       "path": "apps/mobile/build/app/outputs/flutter-apk/app-release.apk",
-      "bytes": 62633423,
-      "sha256": "4c35c5e65a438fc1b0f528381c5e3421d70b423a70f3df4297dc056df9c514c4",
-      "distribution_copy": "distribution/google-play/release/AgentAgenda-2.0.1+8.apk"
+      "bytes": 62722107,
+      "sha256": "fe76f533699b0f8daebc6a6fb661fae7cf26f6e99d0ffd2ab2b0c383556c7563",
+      "distribution_copy": "distribution/google-play/release/AgentAgenda-2.0.2+9.apk"
     }
   ],
   "bundletool": {
@@ -26,8 +26,8 @@
   },
   "manifest": {
     "package": "com.agentagenda.agent_agenda",
-    "version_name": "2.0.1",
-    "version_code": "8",
+    "version_name": "2.0.2",
+    "version_code": "9",
     "min_sdk": "24",
     "target_sdk": "36",
     "permissions": [
@@ -44,13 +44,13 @@
   },
   "signing": {
     "production_certificate_sha256": "35e555ba23217ca7b9565e94b732e3974e6f77e15e9f32496d18d3a507dab69f",
-    "aab_jarfile_payloads": 357,
-    "aab_jarfile_verified_payloads": 357,
+    "aab_jarfile_payloads": 360,
+    "aab_jarfile_verified_payloads": 360,
     "aab_jarfile_unsigned_payloads": 0,
     "aab_jarinputstream_manifest_detected": false,
     "aab_jarinputstream_verified_payloads": 0,
     "payload_difference_between_readers": 0,
-    "manifest_zip_entry_index": 359,
+    "manifest_zip_entry_index": 362,
     "duplicate_zip_names": false,
     "zip_symlinks": 0,
     "certificate_valid_until": "2054-02-23",
@@ -324,7 +324,7 @@
           "end_alignment_check_passed": true
         }
       ],
-      "note": "Five prebuilt RELRO ends do not satisfy the simplified end modulo 16 KB check. Detailed ranges show no non-RELRO writable bytes inside their rounded 16 KB protection range. LOAD/ZIP alignment and actual x86_64 execution pass. ARM 16 KB execution remains untested.",
+      "note": "Non-16 KB RELRO ends occur in unchanged prebuilts. Their rounded ranges contain no non-RELRO writable intervals. Actual version 9 x86_64 runtime passed on 16 KB with compatibility disabled. ARM 16 KB execution is not claimed.",
       "rounded_range_review": [
         {
           "library": "base/lib/arm64-v8a/libdatastore_shared_counter.so",
@@ -388,16 +388,30 @@
         }
       ]
     },
-    "runtime_evidence": "verification/runtime-16kb.json"
+    "runtime_evidence": "verification/runtime-16kb.json",
+    "runtime_validation_pending_for_current_version": false
   },
   "limitations": [
-    "Real 16 KB runtime was exercised on the release APK on Android 16 x86_64; ARM 16 KB execution is not claimed.",
-    "Bundletool structure/generation and signatures do not replace Google Play policy review or actual Console acceptance.",
-    "JarInputStream cannot authenticate this archive due to manifest ZIP ordering; JarFile verifies all 357 payloads and their bytes match both readers. The signed original was not rewritten."
+    "Real 16 KB runtime passed on official Android 16 x86_64; ARM 16 KB execution was not performed.",
+    "Bundletool, signature and R8 results do not replace Google Play policy review or Console acceptance.",
+    "JarInputStream cannot authenticate this archive due to manifest ZIP ordering; JarFile verifies all 360 payloads and their bytes match both readers. The signed original was not rewritten."
   ],
   "sources": [
     "https://developer.android.com/guide/practices/page-sizes",
     "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/jar/JarInputStream.html"
   ],
-  "runtime_16kb_verified": true
+  "runtime_16kb_verified": true,
+  "r8": {
+    "version": "9.1.31",
+    "full_mode": true,
+    "optimized_resource_shrinking": true,
+    "uncompressed_dex_bytes": 2114012,
+    "percentages": {
+      "optimization": 62.26,
+      "obfuscation": 63.33,
+      "shrinking": 63.19
+    }
+  },
+  "notification_icon_retained": true,
+  "runtime_verified_at": "2026-10-09T01:03:46.518776-06:00"
 }

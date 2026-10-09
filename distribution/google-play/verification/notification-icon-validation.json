@@ -1,14 +1,16 @@
 {
-  "path": "distribution/google-play/release/AgentAgenda-2.0.1+8.apk",
-  "sha256": "4c35c5e65a438fc1b0f528381c5e3421d70b423a70f3df4297dc056df9c514c4",
-  "bytes": 62633423,
+  "path": "distribution/google-play/release/AgentAgenda-2.0.2+9.apk",
+  "sha256": "fe76f533699b0f8daebc6a6fb661fae7cf26f6e99d0ffd2ab2b0c383556c7563",
+  "bytes": 62722107,
   "certificate_sha256": "35e555ba23217ca7b9565e94b732e3974e6f77e15e9f32496d18d3a507dab69f",
   "icon_resource": [
-    "    resource 0x7f07005e drawable/ic_notification"
+    "    resource 0x7f07005f drawable/ic_notification"
   ],
-  "version_code": 8,
+  "version_code": 9,
   "compiled_apk_icon_path": "res/vO.xml",
   "aab_resource_table_contains_ic_notification": true,
   "keep_rule_source": "apps/mobile/android/app/src/main/res/raw/agentagenda_keep.xml",
-  "official_keep_rule_documentation": "https://developer.android.com/topic/performance/app-optimization/customize-which-resources-to-keep"
+  "official_keep_rule_documentation": "https://developer.android.com/topic/performance/app-optimization/customize-which-resources-to-keep",
+  "runtime_posted_notification_with_expected_title_body": true,
+  "runtime_evidence": "verification/runtime-16kb.json"
 }

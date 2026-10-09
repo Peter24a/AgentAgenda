@@ -1,0 +1,66 @@
+{
+  "verified_at": "2026-10-08T22:48:51.640807-06:00",
+  "apk_sha256": "4c35c5e65a438fc1b0f528381c5e3421d70b423a70f3df4297dc056df9c514c4",
+  "package": "com.agentagenda.agent_agenda",
+  "version_name": "2.0.1",
+  "version_code": 8,
+  "official_sdk_image": {
+    "package": "system-images;android-36;google_apis_ps16k;x86_64",
+    "revision": 7,
+    "new_license_terms_accepted": false,
+    "sdkmanager_stdin": "DEVNULL",
+    "emulator_version": "37.1.11.0"
+  },
+  "runtime": {
+    "ro.build.version.release": "16",
+    "ro.build.version.sdk": "36",
+    "ro.product.cpu.abi": "x86_64",
+    "ro.build.fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:16/BE2A.250530.026.F3/13894323:userdebug/dev-keys",
+    "bionic.linker.16kb.app_compat.enabled": "false",
+    "pm.16kb.app_compat.disabled": "true",
+    "persist.sys.timezone": "America/Mexico_City",
+    "page_size_bytes": 16384,
+    "app_pid_alive": true
+  },
+  "cold_start": {
+    "status": "ok",
+    "launch_state": "COLD",
+    "total_time_ms": 2949,
+    "wait_time_ms": 2977
+  },
+  "flows": {
+    "synthetic_demo_activation_from_fresh_install": true,
+    "authenticated_agenda_https": true,
+    "day_event_local_times": "09:00 / 11:00 / 17:00 America/Mexico_City",
+    "chat_history_real_assistant_response": true,
+    "document_catalog_two_synthetic_files": true,
+    "privacy_support_data_deletion_links_reachable_in_ui": true,
+    "premium_assistant_button_click_opens_chat_at_2160": true,
+    "short_screen_control_layout": "Source unchanged from version 7; version 7 manual 1080\u00d71920 evidence is retained in verification/history/version-7-runtime-16kb.json",
+    "notification_test_after_first_permission_grant": true,
+    "notification_test_active_in_android": true,
+    "notification_query_scope": "Exact own package test notification ID 2147483646 only",
+    "notification_dynamic_icon_resource": "0x7f07005e"
+  },
+  "crash_logs": {
+    "AndroidRuntime_error": false,
+    "libc_fatal": false,
+    "flutter_error": false
+  },
+  "screenshots": "screenshots/verification.json",
+  "physical_device_evidence": "verification/physical-runtime.json",
+  "limits": [
+    "Real 16 KB runtime exercised only on x86_64. ARM 16 KB was not executed.",
+    "Google Play Console acceptance remains separate."
+  ],
+  "cleanup": {
+    "logout_requested": true,
+    "temporary_emulator_stopped": true,
+    "temporary_avd_deleted": true,
+    "local_session_cleared": true,
+    "activation_screen_restored": true,
+    "existing_user_avds_untouched": true,
+    "official_sdk_image_retained": true,
+    "finished_at": "2026-10-08T22:50:08.482892-06:00"
+  }
+}

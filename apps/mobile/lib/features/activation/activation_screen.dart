@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/branding/sara_brand_mark.dart';
 import '../../core/network/space_session.dart' as session;
 import '../../core/service_links.dart';
 
@@ -60,10 +61,11 @@ class _ActivationScreenState extends State<ActivationScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(
-                      Icons.calendar_month_rounded,
-                      size: 64,
-                      color: theme.colorScheme.primary,
+                    Center(
+                      child: SaraBrandMark(
+                        size: 64,
+                        color: theme.colorScheme.primary,
+                      ),
                     ),
                     const SizedBox(height: 24),
                     Text(

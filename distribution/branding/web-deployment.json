@@ -1,0 +1,40 @@
+{
+  "observed_at": "2026-10-09T06:55:36.310570+00:00",
+  "checks": [
+    {
+      "url": "https://agenda-api.pedroibarra.dev/assets/brand.svg",
+      "http_success": true,
+      "brand_verified": true,
+      "method": "Exact asset bytes",
+      "source_sha256": "97ae5bde37983fedff71a25b4dd65876f1b15a0f2139de6fd1438a29c7626d70"
+    },
+    {
+      "url": "https://agenda-api.pedroibarra.dev/soporte",
+      "http_success": true,
+      "brand_verified": true,
+      "method": "Official brand header matches; Cloudflare may transform other HTML",
+      "source_sha256": "15bc8e02aa44cf71d76ab73a8d9f6c8095598989a527a0081042f80d25786341"
+    },
+    {
+      "url": "https://privacy.ici-labs.com/agentagenda/",
+      "http_success": true,
+      "brand_verified": true,
+      "method": "Official brand header matches; Cloudflare may transform other HTML",
+      "source_sha256": "779338e3403d448c55b4f63fc1161a076119362c3778e98c0885b191245a32c9"
+    },
+    {
+      "url": "https://privacy.ici-labs.com/agentagenda/brand.svg",
+      "http_success": true,
+      "brand_verified": true,
+      "method": "Exact asset bytes",
+      "source_sha256": "97ae5bde37983fedff71a25b4dd65876f1b15a0f2139de6fd1438a29c7626d70"
+    },
+    {
+      "url": "https://privacy.ici-labs.com/agentagenda/eliminacion/",
+      "http_success": true,
+      "brand_verified": true,
+      "method": "Official brand header matches; Cloudflare may transform other HTML",
+      "source_sha256": "71a2436692faaabf4aa08072714425ce5d17f2773536dbbb1e4dfc59785097ce"
+    }
+  ]
+}

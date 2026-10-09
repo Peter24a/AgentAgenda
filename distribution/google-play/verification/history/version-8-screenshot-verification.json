@@ -1,0 +1,68 @@
+{
+  "verified_at": "2026-10-08T22:47:30.408966-06:00",
+  "captures": [
+    {
+      "file": "screenshots/01-agenda-dia-emulador-16kb.png",
+      "width": 1080,
+      "height": 2160,
+      "ratio": 2.0,
+      "mode": "RGB",
+      "bytes": 141625,
+      "sha256": "1b5a6f99f85c8a50b86a0f180b764fe7424714bf65484bef2c1159039a7005dd",
+      "original_screencap_sha256": "0e3f71d314413183baa978369f2d9e11dcb4397e10e37cd6147c9781b67639eb",
+      "source": "Actual Android 16 x86_64 official 16 KB emulator screenshot",
+      "version_name": "2.0.1",
+      "version_code": 8,
+      "synthetic_content_only": true,
+      "pixels_unchanged_on_opaque_rgb_export": true
+    },
+    {
+      "file": "screenshots/02-chat-sara-emulador-16kb.png",
+      "width": 1080,
+      "height": 2160,
+      "ratio": 2.0,
+      "mode": "RGB",
+      "bytes": 186073,
+      "sha256": "d9fb6f9d3dbc1e145cfa162fb63ce216ea85d62e6c5905e058da06c586b1cccb",
+      "original_screencap_sha256": "a710a5922d8347368e6fe994b68becded462ae9aafe571bd6b00b80d7afd8eb0",
+      "source": "Actual Android 16 x86_64 official 16 KB emulator screenshot",
+      "version_name": "2.0.1",
+      "version_code": 8,
+      "synthetic_content_only": true,
+      "pixels_unchanged_on_opaque_rgb_export": true
+    },
+    {
+      "file": "screenshots/03-archivos-emulador-16kb.png",
+      "width": 1080,
+      "height": 2160,
+      "ratio": 2.0,
+      "mode": "RGB",
+      "bytes": 53594,
+      "sha256": "5cd205a1697843230608068b4934c9f1eaff92801eb87c74f16775ee26401579",
+      "original_screencap_sha256": "b3fd7715db63991b4836c269ab7ba7c64d94bab44fbdd795a60245678da64f47",
+      "source": "Actual Android 16 x86_64 official 16 KB emulator screenshot",
+      "version_name": "2.0.1",
+      "version_code": 8,
+      "synthetic_content_only": true,
+      "pixels_unchanged_on_opaque_rgb_export": true
+    },
+    {
+      "file": "screenshots/04-privacidad-emulador-16kb.png",
+      "width": 1080,
+      "height": 2160,
+      "ratio": 2.0,
+      "mode": "RGB",
+      "bytes": 191047,
+      "sha256": "8e2b7a3296398f3c174537c01578d29769593b253748ee03dbbd386f55087b0e",
+      "original_screencap_sha256": "2fdd31938266151b739ee34528c021f6fbd466334ebf594d728ee7bc1fdf9f74",
+      "source": "Actual Android 16 x86_64 official 16 KB emulator screenshot",
+      "version_name": "2.0.1",
+      "version_code": 8,
+      "synthetic_content_only": true,
+      "pixels_unchanged_on_opaque_rgb_export": true
+    }
+  ],
+  "no_crop_or_ui_generation": true,
+  "physical_pixel_device": false,
+  "historical_note": "Version 8 capture hashes are retained here. Current screenshot file paths and runtime-screenshots originals were replaced by genuine version 9 captures; do not interpret current files as historical version 8 pixels."
+}

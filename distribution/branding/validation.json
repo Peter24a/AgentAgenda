@@ -1,0 +1,15 @@
+{
+  "sourcePaths": 4,
+  "geometry": "Exact official path data and translations",
+  "android": {
+    "canvasDp": 108,
+    "safeCircleDiameterDp": 66,
+    "markMaxRadiusDp": 27.960559314814606,
+    "adaptive": true,
+    "monochrome": true
+  },
+  "play": {
+    "container": "Full bleed; Play applies the mask",
+    "symbolTransform": "translate(76 121) scale(0.5) translate(-150 -70)"
+  }
+}

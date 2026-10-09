@@ -1,9 +1,9 @@
 {
-  "verified_at": "2026-10-08T22:48:51.640807-06:00",
-  "apk_sha256": "4c35c5e65a438fc1b0f528381c5e3421d70b423a70f3df4297dc056df9c514c4",
+  "verified_at": "2026-10-09T01:03:46.518776-06:00",
+  "apk_sha256": "fe76f533699b0f8daebc6a6fb661fae7cf26f6e99d0ffd2ab2b0c383556c7563",
   "package": "com.agentagenda.agent_agenda",
-  "version_name": "2.0.1",
-  "version_code": 8,
+  "version_name": "2.0.2",
+  "version_code": 9,
   "official_sdk_image": {
     "package": "system-images;android-36;google_apis_ps16k;x86_64",
     "revision": 7,
@@ -25,22 +25,24 @@
   "cold_start": {
     "status": "ok",
     "launch_state": "COLD",
-    "total_time_ms": 2949,
-    "wait_time_ms": 2977
+    "total_time_ms": 2359,
+    "wait_time_ms": 2368
   },
   "flows": {
     "synthetic_demo_activation_from_fresh_install": true,
+    "activation_official_sara_symbol_visible": true,
     "authenticated_agenda_https": true,
-    "day_event_local_times": "09:00 / 11:00 / 17:00 America/Mexico_City",
     "chat_history_real_assistant_response": true,
     "document_catalog_two_synthetic_files": true,
     "privacy_support_data_deletion_links_reachable_in_ui": true,
-    "premium_assistant_button_click_opens_chat_at_2160": true,
-    "short_screen_control_layout": "Source unchanged from version 7; version 7 manual 1080\u00d71920 evidence is retained in verification/history/version-7-runtime-16kb.json",
+    "official_sara_button_click_opens_chat_at_2160": true,
+    "activity_card_and_assistant_button_do_not_overlap_at_2160": true,
+    "adaptive_launcher_symbol_visually_verified": true,
+    "launcher_icon_tap_reopens_app": true,
     "notification_test_after_first_permission_grant": true,
     "notification_test_active_in_android": true,
     "notification_query_scope": "Exact own package test notification ID 2147483646 only",
-    "notification_dynamic_icon_resource": "0x7f07005e"
+    "notification_dynamic_icon_resource": "0x7f07005f"
   },
   "crash_logs": {
     "AndroidRuntime_error": false,
@@ -48,10 +50,10 @@
     "flutter_error": false
   },
   "screenshots": "screenshots/verification.json",
-  "physical_device_evidence": "verification/physical-runtime.json",
   "limits": [
     "Real 16 KB runtime exercised only on x86_64. ARM 16 KB was not executed.",
-    "Google Play Console acceptance remains separate."
+    "Version 9 physical device runtime was not exercised by this agent. Historical version 8 evidence remains separate.",
+    "Google Play Console acceptance and policy review remain separate."
   ],
   "cleanup": {
     "logout_requested": true,
@@ -61,6 +63,7 @@
     "activation_screen_restored": true,
     "existing_user_avds_untouched": true,
     "official_sdk_image_retained": true,
-    "finished_at": "2026-10-08T22:50:08.482892-06:00"
-  }
+    "finished_at": "2026-10-09T01:03:46.518776-06:00"
+  },
+  "launcher_evidence": "verification/launcher-adaptive-version-9.png"
 }

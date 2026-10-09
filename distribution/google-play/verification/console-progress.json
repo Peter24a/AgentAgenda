@@ -1,8 +1,8 @@
 {
-  "observed_at": "2026-10-08T23:20:06.966452-06:00",
+  "observed_at": "2026-10-09T07:04:56.542291+00:00",
   "app_title": "AgentAgenda",
   "package": "com.agentagenda.agent_agenda",
-  "version": "2.0.1+8",
+  "version": "2.0.2+9",
   "console_app_url": "https://play.google.com/console/u/0/developers/6684017531863570645/app/4974453354887300444/app-dashboard",
   "saved_declarations": [
     "privacy",
@@ -15,19 +15,20 @@
     "category_productivity",
     "support_email_and_website",
     "default_store_listing_es_419",
-    "data_safety"
+    "data_safety",
+    "iarc_content_rating"
   ],
-  "store_listing_status": "Ready to send for review",
-  "screenshots": "4 real emulator screenshots of +8 with synthetic review-space data",
+  "store_listing_status": "Changes in review: official icon, feature graphic and five real version-9 screenshots",
+  "screenshots": "5 real 1080x2160 emulator screenshots of +9 with synthetic review-space data; order agenda, chat, files, privacy, activation",
   "illustration_ai_label": [
     "app-icon-512.png",
     "feature-graphic-1024x500.png"
   ],
   "review_credential_user_authorized": true,
   "additional_google_partner_feedback_opt_in": false,
-  "iarc_status": "Prepared category and email; acceptance of IARC Terms of Use awaiting explicit user confirmation",
-  "data_safety_status": "Saved successfully in Play Console; 17 categories verified against the actual Console CSV export; not yet submitted for review",
-  "release_status": "Version code 8 (2.0.1) uploaded, processed and published to active internal testing; unrevised temporary store name",
+  "iarc_status": "Completed; prior version 8 review approved and closed release published on 2026-10-09 00:51 America/Mexico_City",
+  "data_safety_status": "Saved and exported matrix verified; included in approved prior version 8 review",
+  "release_status": "Version code 9 (2.0.2) available for internal testers; closed Beta version 9 submitted for review",
   "signing_status": "User chose to retain the new Google distribution signing certificate; local key was not imported",
   "existing_apk_certificate_sha256": "35e555ba23217ca7b9565e94b732e3974e6f77e15e9f32496d18d3a507dab69f",
   "google_assigned_certificate_sha256": "0cf134d328f1f4beaee5b22686b2959e380b47aacd51b4b75f14a6a7c2298777",
@@ -35,7 +36,7 @@
     "closed_test": true,
     "minimum_opted_in_testers": 12,
     "minimum_consecutive_days": 14,
-    "current_testers": 0
+    "note": "Allowlist count does not prove opt-in or satisfy the 12 testers/14 consecutive days requirement."
   },
   "limitations": [
     "Console setup and uploading do not imply policy approval or production publication.",
@@ -44,8 +45,8 @@
   ],
   "deletion_url": "https://privacy.ici-labs.com/agentagenda/eliminacion/",
   "internal_test_url": "https://play.google.com/apps/internaltest/4700803363705001483",
-  "internal_testers": "One own account in AgentAgenda — Pedro; other existing account lists not selected",
-  "migration_from_direct_apk": "One uninstall/reinstall will be required when switching from current direct APK to Google Play, followed by reconnection to same server space",
+  "internal_testers": "Four authorized accounts in shared AgentAgenda — Beta; Roberto added and saved; no emails sent",
+  "migration_from_direct_apk": "Phone was uninstalled in previous task at user request; no direct APK installed in this update; user will install Google-signed Play version and reconnect the existing server space.",
   "data_safety_export": {
     "path": "distribution/google-play/verification/data-safety-console-export.csv",
     "sha256": "727356bef12412cec98206b1c4ced498d8d5707063c43ba7c2c0e02aee5ec005",
@@ -55,7 +56,36 @@
     "shared": 4,
     "audit": "Matches saved purpose and sharing matrix without discrepancies"
   },
-  "setup_tasks_completed": 10,
+  "setup_tasks_completed": 11,
   "setup_tasks_total": 11,
-  "remaining_setup_task": "IARC content rating; pending user authorization to accept Terms of Use"
+  "closed_test": {
+    "track_name": "Beta AgentAgenda",
+    "release_name": "2.0.2 (9) — Beta Identidad SARA",
+    "version_code": 9,
+    "status": "Changes in review",
+    "submitted_change_count": 4,
+    "submitted_changes": [
+      "closed release version 9",
+      "store icon",
+      "phone screenshots",
+      "feature graphic"
+    ],
+    "preliminary_checks": "Running; Console displayed up to 14 minutes before review proceeds",
+    "approved": false,
+    "production_published": false
+  },
+  "internal_test": {
+    "release_name": "2.0.2 (9) — Identidad SARA",
+    "version_code": 9,
+    "status": "Available to internal testers",
+    "published_at_console_local": "2026-10-09 01:01 America/Mexico_City",
+    "allowlist_count": 4,
+    "testers_are_shared_with_closed_track": true
+  },
+  "brand_sources": "distribution/branding/sources.json",
+  "device_compatibility_changes": {
+    "lost_devices": 0,
+    "phone_models": 12344,
+    "tablet_models": 6780
+  }
 }

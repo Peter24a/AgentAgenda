@@ -1,0 +1,96 @@
+{
+  "artifact": "AgentAgenda-2.0.1+8.aab",
+  "sha256": "baad0eed63e2ee9d114f33860f018d21c49b331d5c4acc0aec25809762737d66",
+  "metadata_path": "BUNDLE-METADATA/com.android.tools/r8.json",
+  "r8_version": "9.1.31",
+  "dex_files": [
+    {
+      "path": "base/dex/classes.dex",
+      "uncompressed_bytes": 1915528
+    },
+    {
+      "path": "base/dex/classes2.dex",
+      "uncompressed_bytes": 198484
+    }
+  ],
+  "uncompressed_dex_bytes": 2114012,
+  "optimization_enabled": true,
+  "obfuscation_enabled": true,
+  "shrinking_enabled": true,
+  "full_mode": true,
+  "optimized_resource_shrinking": true,
+  "percentages": {
+    "optimization": 62.26,
+    "obfuscation": 63.33,
+    "shrinking": 63.19
+  },
+  "verified_at": "2026-10-09T06:47:29.275094+00:00",
+  "version_name": "2.0.1",
+  "version_code": 8,
+  "reproduce_command": "python distribution/google-play/verify-dex-optimization.py distribution/google-play/release/AgentAgenda-2.0.1+8.aab",
+  "effective_gradle_configuration": {
+    "agp_version": "9.1.0",
+    "flutter_version": "3.47.2",
+    "minify_enabled": true,
+    "shrink_resources": true,
+    "proguard_files": [
+      "proguard-android-optimize.txt-9.1.0",
+      "flutter_proguard_rules.pro"
+    ],
+    "explicit_full_mode_property": null,
+    "optimized_resource_shrinking_property": null,
+    "shrink_property": null,
+    "verified_by": "Gradle help --offline with temporary read-only init script; no release artifact generated"
+  },
+  "combined_rule_audit": {
+    "configuration_path": "apps/mobile/build/app/outputs/mapping/release/configuration.txt",
+    "configuration_sha256": "7ba67724a415c8cd7ecea5c2f17e466dd1e57f5eb2ba2b8935c62c0e684f5fb5",
+    "global_dontoptimize": false,
+    "global_dontshrink": false,
+    "global_dontobfuscate": false,
+    "plugin_and_JNI_consumer_rules_preserved": true
+  },
+  "mapping_in_bundle": true,
+  "notification_icon": {
+    "keep_source": "apps/mobile/android/app/src/main/res/raw/agentagenda_keep.xml",
+    "resource": "@drawable/ic_notification",
+    "present_in_bundle_resource_table": true,
+    "keep_rule_changed": false
+  },
+  "console_correlation": {
+    "version_code": 8,
+    "source": "Root agent verified the same bundle in Play Console",
+    "rounded_percentages": {
+      "optimization": 62,
+      "obfuscation": 63,
+      "shrinking": 63
+    },
+    "dex_MB_displayed": 2.11,
+    "full_mode_displayed": true,
+    "optimized_resource_shrinking_displayed": true,
+    "recommendation_is_not_an_error": true
+  },
+  "announced_play_requirement": {
+    "effective_month": "2027-02",
+    "app_dex_size_scope_above_bytes": 10000000,
+    "minimum_each_percentage": 25,
+    "this_bundle_below_dex_size_scope": true,
+    "this_bundle_meets_minimum_percentages": true
+  },
+  "summary_es": [
+    "El bundle +8 ya reduce, ofusca y optimiza DEX con R8 en modo completo y reducción de recursos optimizada.",
+    "DEX sin comprimir: 2 114 012 bytes. La optimización alcanza 62.26 %, la ofuscación 63.33 % y la reducción 63.19 %, coincidentes con las cifras redondeadas de Play Console.",
+    "No hace falta cambiar Gradle ni retirar reglas de Flutter/plugins/reflexión para esta recomendación. El umbral anunciado para febrero de 2027 es 25 % por métrica y sólo se exige a apps con más de 10 MB de DEX.",
+    "Esta auditoría no sustituye pruebas de rendimiento, compatibilidad nativa de 16 KB ni aprobación de Google Play; verifica el bundle específico indicado."
+  ],
+  "source_changes": false,
+  "release_rebuilt": false,
+  "apk_installed": false,
+  "play_uploaded": false,
+  "sources": [
+    "https://developer.android.com/topic/performance/issues/code-optimization",
+    "https://developer.android.com/topic/performance/app-optimization/enable-app-optimization",
+    "https://docs.flutter.dev/deployment/android#shrink-your-code-with-r8",
+    "https://support.google.com/googleplay/android-developer/answer/17492799?hl=en"
+  ]
+}

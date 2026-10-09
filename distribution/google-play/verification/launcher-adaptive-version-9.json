@@ -1,0 +1,17 @@
+{
+  "path": "verification/launcher-adaptive-version-9.png",
+  "bytes": 1181322,
+  "sha256": "24b617934c0f18dfb4d8efa6971a86a220e65a03797815069c3ad01fba7694b2",
+  "dimensions": [
+    1080,
+    2160
+  ],
+  "mode": "RGB",
+  "original_screencap_sha256": "e784ec158fa3bfa9e32382a01b3d287c02102168ba850876567aa74bc606c85f",
+  "pixels_unchanged": true,
+  "version_name": "2.0.2",
+  "version_code": 9,
+  "source": "Actual official Android 16 16 KB emulator launcher",
+  "synthetic_content_only": true,
+  "not_for_store_screenshot_listing": true
+}

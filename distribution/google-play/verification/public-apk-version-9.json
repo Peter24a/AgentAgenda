@@ -1,0 +1,10 @@
+{
+  "observed_at": "2026-10-09T07:03:50.076063+00:00",
+  "url": "https://agenda-api.pedroibarra.dev/download/agentagenda.apk",
+  "version_name": "2.0.2",
+  "version_code": 9,
+  "sha256": "fe76f533699b0f8daebc6a6fb661fae7cf26f6e99d0ffd2ab2b0c383556c7563",
+  "bytes": 62722107,
+  "matches_signed_release": true,
+  "phone_install_attempted": false
+}

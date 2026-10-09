@@ -1,0 +1,61 @@
+{
+  "observed_at": "2026-10-08T23:20:06.966452-06:00",
+  "app_title": "AgentAgenda",
+  "package": "com.agentagenda.agent_agenda",
+  "version": "2.0.1+8",
+  "console_app_url": "https://play.google.com/console/u/0/developers/6684017531863570645/app/4974453354887300444/app-dashboard",
+  "saved_declarations": [
+    "privacy",
+    "review_access",
+    "no_ads",
+    "target_audience_13_15_16_17_18_plus",
+    "government_no",
+    "finance_no",
+    "health_no",
+    "category_productivity",
+    "support_email_and_website",
+    "default_store_listing_es_419",
+    "data_safety"
+  ],
+  "store_listing_status": "Ready to send for review",
+  "screenshots": "4 real emulator screenshots of +8 with synthetic review-space data",
+  "illustration_ai_label": [
+    "app-icon-512.png",
+    "feature-graphic-1024x500.png"
+  ],
+  "review_credential_user_authorized": true,
+  "additional_google_partner_feedback_opt_in": false,
+  "iarc_status": "Prepared category and email; acceptance of IARC Terms of Use awaiting explicit user confirmation",
+  "data_safety_status": "Saved successfully in Play Console; 17 categories verified against the actual Console CSV export; not yet submitted for review",
+  "release_status": "Version code 8 (2.0.1) uploaded, processed and published to active internal testing; unrevised temporary store name",
+  "signing_status": "User chose to retain the new Google distribution signing certificate; local key was not imported",
+  "existing_apk_certificate_sha256": "35e555ba23217ca7b9565e94b732e3974e6f77e15e9f32496d18d3a507dab69f",
+  "google_assigned_certificate_sha256": "0cf134d328f1f4beaee5b22686b2959e380b47aacd51b4b75f14a6a7c2298777",
+  "production_access_requirements": {
+    "closed_test": true,
+    "minimum_opted_in_testers": 12,
+    "minimum_consecutive_days": 14,
+    "current_testers": 0
+  },
+  "limitations": [
+    "Console setup and uploading do not imply policy approval or production publication.",
+    "No participant invitations or personal-content screenshots were sent.",
+    "Credentials and private keys are absent from this record."
+  ],
+  "deletion_url": "https://privacy.ici-labs.com/agentagenda/eliminacion/",
+  "internal_test_url": "https://play.google.com/apps/internaltest/4700803363705001483",
+  "internal_testers": "One own account in AgentAgenda — Pedro; other existing account lists not selected",
+  "migration_from_direct_apk": "One uninstall/reinstall will be required when switching from current direct APK to Google Play, followed by reconnection to same server space",
+  "data_safety_export": {
+    "path": "distribution/google-play/verification/data-safety-console-export.csv",
+    "sha256": "727356bef12412cec98206b1c4ced498d8d5707063c43ba7c2c0e02aee5ec005",
+    "data_types": 17,
+    "required": 5,
+    "optional": 12,
+    "shared": 4,
+    "audit": "Matches saved purpose and sharing matrix without discrepancies"
+  },
+  "setup_tasks_completed": 10,
+  "setup_tasks_total": 11,
+  "remaining_setup_task": "IARC content rating; pending user authorization to accept Terms of Use"
+}

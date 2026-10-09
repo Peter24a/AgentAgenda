@@ -1,8 +1,5 @@
-AgentAgenda 2.0.1
-• Una app para conectar tu espacio personal con un código.
-• Agenda, tareas, archivos y asistente con propuestas revisables.
-• Horarios según tu zona y controles visibles en pantallas cortas.
-• Privacidad, soporte y solicitud de eliminación accesibles.
-• Reporte de respuestas de IA con revisión antes de enviar.
-• Selector de archivos sin acceso amplio a la galería y fuentes incluidas.
-• Icono de avisos conservado en la compilación de publicación.
+AgentAgenda 2.0.2
+• Identidad visual SARA unificada en la app y su ficha de Play.
+• Icono adaptable a la forma y al tema de tu pantalla de inicio.
+• Símbolo oficial en la activación y el botón del asistente.
+• Agenda, archivos y conversaciones conservados en tu espacio personal.
