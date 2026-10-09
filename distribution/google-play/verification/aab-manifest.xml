@@ -1,0 +1,134 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:compileSdkVersion="36" android:compileSdkVersionCodename="16" android:versionCode="8" android:versionName="2.0.1" package="com.agentagenda.agent_agenda" platformBuildVersionCode="36" platformBuildVersionName="16">
+      
+  <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="36"/>
+      
+  <uses-permission android:name="android.permission.INTERNET"/>
+      
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+      
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+      
+  <uses-permission android:name="com.android.alarm.permission.SET_ALARM"/>
+      
+    
+  <queries>
+            
+    <intent>
+                  
+      <action android:name="android.intent.action.SET_ALARM"/>
+              
+    </intent>
+            
+    <intent>
+                  
+      <action android:name="android.intent.action.PROCESS_TEXT"/>
+                  
+      <data android:mimeType="text/plain"/>
+              
+    </intent>
+            
+    <intent>
+                  
+      <action android:name="android.intent.action.GET_CONTENT"/>
+                  
+      <data android:mimeType="*/*"/>
+              
+    </intent>
+        
+  </queries>
+      
+  <uses-permission android:name="android.permission.VIBRATE"/>
+      
+  <permission android:name="com.agentagenda.agent_agenda.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" android:protectionLevel="0x00000002"/>
+      
+  <uses-permission android:name="com.agentagenda.agent_agenda.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"/>
+      
+  <application android:allowBackup="false" android:appComponentFactory="androidx.core.app.CoreComponentFactory" android:extractNativeLibs="false" android:icon="@mipmap/ic_launcher" android:label="AgentAgenda" android:name="android.app.Application" android:usesCleartextTraffic="false">
+            
+    <activity android:configChanges="0x40003fb4" android:exported="true" android:hardwareAccelerated="true" android:launchMode="1" android:name="com.agentagenda.agent_agenda.MainActivity" android:taskAffinity="" android:theme="@style/LaunchTheme" android:windowSoftInputMode="0x00000010">
+                  
+            
+      <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme"/>
+                  
+      <intent-filter>
+                        
+        <action android:name="android.intent.action.MAIN"/>
+                        
+        <category android:name="android.intent.category.LAUNCHER"/>
+                    
+      </intent-filter>
+              
+    </activity>
+            
+        
+    <meta-data android:name="flutterEmbedding" android:value="2"/>
+            
+    <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"/>
+            
+    <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+                  
+      <intent-filter>
+                        
+        <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                        
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                        
+        <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                        
+        <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+                    
+      </intent-filter>
+              
+    </receiver>
+            
+    <provider android:authorities="com.agentagenda.agent_agenda.fileProvider.com.crazecoder.openfile" android:exported="false" android:grantUriPermissions="true" android:name="com.crazecoder.openfile.FileProvider">
+                  
+      <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/filepaths"/>
+              
+    </provider>
+            
+    <provider android:authorities="com.agentagenda.agent_agenda.androidx-startup" android:exported="false" android:name="androidx.startup.InitializationProvider">
+                  
+      <meta-data android:name="androidx.emoji2.text.EmojiCompatInitializer" android:value="androidx.startup"/>
+                  
+      <meta-data android:name="androidx.lifecycle.ProcessLifecycleInitializer" android:value="androidx.startup"/>
+                  
+      <meta-data android:name="androidx.profileinstaller.ProfileInstallerInitializer" android:value="androidx.startup"/>
+              
+    </provider>
+            
+    <uses-library android:name="androidx.window.extensions" android:required="false"/>
+            
+    <uses-library android:name="androidx.window.sidecar" android:required="false"/>
+            
+    <receiver android:directBootAware="false" android:enabled="true" android:exported="true" android:name="androidx.profileinstaller.ProfileInstallReceiver" android:permission="android.permission.DUMP">
+                  
+      <intent-filter>
+                        
+        <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE"/>
+                    
+      </intent-filter>
+                  
+      <intent-filter>
+                        
+        <action android:name="androidx.profileinstaller.action.SKIP_FILE"/>
+                    
+      </intent-filter>
+                  
+      <intent-filter>
+                        
+        <action android:name="androidx.profileinstaller.action.SAVE_PROFILE"/>
+                    
+      </intent-filter>
+                  
+      <intent-filter>
+                        
+        <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION"/>
+                    
+      </intent-filter>
+              
+    </receiver>
+        
+  </application>
+  
+</manifest>

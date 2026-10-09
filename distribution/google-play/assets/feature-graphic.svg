@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+  <title>AgentAgenda · Dale espacio a tu día</title>
+  <rect width="1024" height="500" fill="#F7F5F2"/>
+  <path d="M688 0H1024V500H742C722 461 722 405 738 353C750 314 742 282 710 238C662 174 643 82 688 0Z" fill="#EEE8F1"/>
+  <text x="64" y="76" fill="#6B4F73" font-family="Manrope, sans-serif" font-size="24" font-weight="700">AgentAgenda</text>
+  <rect x="64" y="113" width="34" height="4" rx="2" fill="#6B4F73"/>
+  <text x="64" y="202" fill="#251F29" font-family="Manrope, sans-serif" font-size="60" font-weight="700">Dale espacio</text>
+  <text x="64" y="272" fill="#251F29" font-family="Manrope, sans-serif" font-size="60" font-weight="700">a tu día.</text>
+  <text x="66" y="337" fill="#6C636F" font-family="Inter, sans-serif" font-size="23" font-weight="400">Agenda, archivos y un asistente</text>
+  <text x="66" y="374" fill="#6C636F" font-family="Inter, sans-serif" font-size="23" font-weight="400">para organizar lo que sigue.</text>
+  <g transform="translate(693 93)">
+    <path d="M-48 214C-13 257 11 251 46 206C75 168 115 137 142 163C166 186 173 224 199 241C223 258 261 246 276 217" fill="none" stroke="#C5AED0" stroke-width="15" stroke-linecap="round"/>
+    <g transform="rotate(-9 84 99)">
+      <rect x="5" y="28" width="170" height="178" rx="20" fill="#FFFFFF" stroke="#DED8E2" stroke-width="2"/>
+      <path d="M25 28H155A20 20 0 0 1 175 48V81H5V48A20 20 0 0 1 25 28Z" fill="#6B4F73"/>
+      <path d="M43 14V45M133 14V45" stroke="#251F29" stroke-width="9" stroke-linecap="round"/>
+      <g fill="#C5AED0">
+        <circle cx="43" cy="113" r="9"/><circle cx="89" cy="113" r="9"/><circle cx="135" cy="113" r="9"/>
+        <circle cx="43" cy="159" r="9"/><circle cx="89" cy="159" r="9"/>
+      </g>
+      <circle cx="135" cy="159" r="17" fill="#EEE8F1"/>
+      <path d="M127 159L133 165L144 152" fill="none" stroke="#6B4F73" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g transform="translate(119 147) rotate(9 60 72)">
+      <path d="M16 0H72L119 47V129A16 16 0 0 1 103 145H16A16 16 0 0 1 0 129V16A16 16 0 0 1 16 0Z" fill="#FFFFFF" stroke="#DED8E2" stroke-width="2"/>
+      <path d="M72 0V36A11 11 0 0 0 83 47H119" fill="#EEE8F1" stroke="#DED8E2" stroke-width="2"/>
+      <path d="M24 80H92M24 101H77M24 122H64" stroke="#C5AED0" stroke-width="6" stroke-linecap="round"/>
+    </g>
+    <path d="M226 28L234 50L256 58L234 66L226 88L218 66L196 58L218 50Z" fill="#6B4F73"/>
+    <path d="M190 0L193 9L202 12L193 15L190 24L187 15L178 12L187 9Z" fill="#C5AED0"/>
+  </g>
+</svg>

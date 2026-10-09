@@ -357,7 +357,7 @@ class _ActivityCard extends StatelessWidget {
                         Text(
                           item.description?.isNotEmpty == true
                               ? item.description!
-                              : 'Actividad programada en SARA Agenda.',
+                              : 'Actividad programada en AgentAgenda.',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: colorScheme.onSurfaceVariant.withValues(
                               alpha: isPast ? 0.45 : 0.85,

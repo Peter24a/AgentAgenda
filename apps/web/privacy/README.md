@@ -8,4 +8,6 @@ El portal raíz está generado previamente con Astro y no tiene un proyecto fuen
 
 Antes de modificar el índice raíz, guardar una copia en un directorio privado y comparar el hash del archivo con la versión inspeccionada. Publicar mediante reemplazo atómico dentro del mismo sistema de archivos. La copia anterior a esta integración está en `/home/peter/.local/share/agentagenda/privacy-portal-backups/index-before-agentagenda-20261008T214625.html`.
 
-La página de ayuda y solicitudes de eliminación está en `https://agenda-api.pedroibarra.dev/soporte#eliminacion`; su fuente es `../public/support.html`. `/privacidad` del servicio principal redirige a la política canónica.
+La página dedicada de eliminación es `https://privacy.ici-labs.com/agentagenda/eliminacion/`; su fuente está en `agentagenda/eliminacion/index.html` y reutiliza `../style.css`. Es legible sin JavaScript ni sesión. Publicar su URL con barra final evita el redireccionamiento de directorio del nginx interno.
+
+La página de ayuda y su formulario revisable de solicitud siguen en `https://agenda-api.pedroibarra.dev/soporte#eliminacion`; su fuente es `../public/support.html`. La app Android +8 conserva este enlace. La declaración de Google Play usa la página estática dedicada, que responde a GET y HEAD. No es necesario recompilar la app para mantener ambas vías. `/privacidad` del servicio principal redirige a la política canónica.

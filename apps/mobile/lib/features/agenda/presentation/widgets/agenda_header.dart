@@ -64,7 +64,7 @@ class AgendaHeader extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'SARA Agenda',
+                      'AgentAgenda',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.2,

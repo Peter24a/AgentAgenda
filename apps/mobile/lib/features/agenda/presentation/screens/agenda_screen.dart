@@ -507,14 +507,19 @@ class _AgendaScreenState extends State<AgendaScreen>
                       ),
                     ),
                   ),
-                const SliverToBoxAdapter(child: SizedBox(height: 110)),
+                const SliverToBoxAdapter(child: SizedBox(height: 24)),
               ],
             ),
           ),
         ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: PremiumAgentButton(onTap: () => _openAgentChat()),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Align(
+          heightFactor: 1,
+          child: PremiumAgentButton(onTap: () => _openAgentChat()),
+        ),
+      ),
     );
   }
 }

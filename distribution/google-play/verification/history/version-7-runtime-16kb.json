@@ -1,0 +1,97 @@
+{
+  "verified_at": "2026-10-08T22:22:39.349938-06:00",
+  "apk_sha256": "bf86f8adcdf41681a196e5d99f97c22aa6d79b4eeeaef1996b074b160c42a236",
+  "package": "com.agentagenda.agent_agenda",
+  "version_name": "2.0.1",
+  "version_code": 7,
+  "official_sdk_image": {
+    "package": "system-images;android-36;google_apis_ps16k;x86_64",
+    "revision": 7,
+    "new_license_terms_accepted": false,
+    "sdkmanager_stdin": "DEVNULL",
+    "emulator_version": "37.1.11.0"
+  },
+  "runtime": {
+    "ro.build.version.release": "16",
+    "ro.build.version.sdk": "36",
+    "ro.product.cpu.abi": "x86_64",
+    "ro.build.fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:16/BE2A.250530.026.F3/13894323:userdebug/dev-keys",
+    "bionic.linker.16kb.app_compat.enabled": "false",
+    "pm.16kb.app_compat.disabled": "true",
+    "persist.sys.timezone": "America/Mexico_City",
+    "page_size_bytes": 16384,
+    "app_pid_alive": true
+  },
+  "cold_start": {
+    "status": "ok",
+    "launch_state": "COLD",
+    "total_time_ms": 2978,
+    "wait_time_ms": 2981
+  },
+  "flows": {
+    "existing_synthetic_demo_session_preserved_on_update": true,
+    "authenticated_agenda_https": true,
+    "day_event_local_times": "09:00 / 11:00 / 17:00 America/Mexico_City",
+    "chat_history_real_assistant_response": true,
+    "document_catalog_two_synthetic_files": true,
+    "privacy_support_data_deletion_links_reachable_in_ui": true,
+    "report_review_dialog_checked_on_previous_version_without_submit": true,
+    "premium_assistant_button_click_opens_chat_at_2160": true,
+    "card_button_at_2160": {
+      "bounds": [
+        114,
+        1668,
+        636,
+        1794
+      ],
+      "assistant_bounds": [
+        165,
+        1950,
+        915,
+        2076
+      ],
+      "no_overlap": true
+    },
+    "short_screen_layout": {
+      "resolution": [
+        1080,
+        1920
+      ],
+      "card_button_bounds": [
+        114,
+        1364,
+        636,
+        1490
+      ],
+      "reserved_assistant_bounds": [
+        165,
+        1710,
+        915,
+        1836
+      ],
+      "card_button_fully_visible_after_scroll": true,
+      "no_overlap": true,
+      "card_button_click_opens_chat": true
+    }
+  },
+  "crash_logs": {
+    "AndroidRuntime_error": false,
+    "libc_fatal": false,
+    "flutter_error": false
+  },
+  "screenshots": "Version 7 screenshots were replaced by actual version 8 captures in screenshots/; current screenshot metadata identifies version 8.",
+  "limits": [
+    "Real 16 KB runtime exercised only on x86_64. ARM 16 KB was not executed.",
+    "Google Play Console acceptance and a final physical Pixel test are separate."
+  ],
+  "cleanup": {
+    "logout_requested": true,
+    "temporary_emulator_stopped": true,
+    "temporary_avd_deleted": true,
+    "existing_user_avds_untouched": true,
+    "official_sdk_image_retained": true,
+    "local_session_cleared": true,
+    "activation_screen_restored": true,
+    "finished_at": "2026-10-08T22:25:47.753333-06:00"
+  }
+}

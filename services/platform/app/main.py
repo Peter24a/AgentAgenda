@@ -502,11 +502,11 @@ def create_app(settings: Settings | None = None, registry: Registry | None = Non
 
     web_root = Path(cfg.web_root)
 
-    @app.get("/privacidad")
+    @app.api_route("/privacidad", methods=["GET", "HEAD"])
     async def privacy_policy():
         return RedirectResponse("https://privacy.ici-labs.com/agentagenda/", status_code=302)
 
-    @app.get("/soporte")
+    @app.api_route("/soporte", methods=["GET", "HEAD"])
     async def public_support():
         path = web_root / "support.html"
         if not path.is_file():

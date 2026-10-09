@@ -1,0 +1,4 @@
+# Preserve exact Google Console and bundletool exports, including their whitespace.
+distribution/google-play/verification/data-safety-console-export.csv -text whitespace=-blank-at-eol,cr-at-eol
+distribution/google-play/verification/aab-manifest.xml whitespace=-blank-at-eol
+distribution/google-play/verification/history/*-aab-manifest.xml whitespace=-blank-at-eol

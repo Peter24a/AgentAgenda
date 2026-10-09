@@ -1,0 +1,22 @@
+{
+  "target": "/home/cite/AgentAgenda-platform/downloads/agentagenda.apk",
+  "version_code": 8,
+  "sha256": "4c35c5e65a438fc1b0f528381c5e3421d70b423a70f3df4297dc056df9c514c4",
+  "bytes": 62633423,
+  "uid": 0,
+  "gid": 0,
+  "mode": "0o644",
+  "backup": "/home/cite/AgentAgenda-platform/recovery-apk-v2.0.1-code7.apk",
+  "backup_sha256": "bf86f8adcdf41681a196e5d99f97c22aa6d79b4eeeaef1996b074b160c42a236",
+  "backup_mode": "0o600",
+  "atomic_replace": true,
+  "verified_at": "2026-10-08T22:51:45.686071-06:00",
+  "public_url": "https://agenda-api.pedroibarra.dev/download/agentagenda.apk",
+  "http_status": 200,
+  "content_type": "application/vnd.android.package-archive",
+  "content_length": "62633423",
+  "public_download_sha256": "4c35c5e65a438fc1b0f528381c5e3421d70b423a70f3df4297dc056df9c514c4",
+  "public_download_bytes": 62633423,
+  "public_download_verified_by_stream": true,
+  "env_or_deployment_manifest_changed": false
+}

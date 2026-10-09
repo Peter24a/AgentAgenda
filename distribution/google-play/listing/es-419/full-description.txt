@@ -1,0 +1,30 @@
+AgentAgenda reúne tu agenda, tus tareas y tus archivos en un espacio personal, con un asistente que te ayuda a organizar el día.
+
+ANTES DE EMPEZAR
+Necesitas un espacio creado por el administrador del servicio y un código de activación. La app no ofrece registro público ni crea una cuenta automáticamente. Si todavía no tienes acceso, consulta a soporte antes de instalarla. Cada persona se conecta a su propio espacio con la misma app.
+
+ORGANIZA TU AGENDA
+Consulta tus actividades por día, semana o mes. Crea eventos, cambia horarios, marca lo que completaste y lleva tus tareas en un mismo lugar.
+
+UN ASISTENTE PARA LO QUE SIGUE
+Conversa con el asistente para planear, revisar conflictos de horario o preparar cambios en tu agenda. Revisa sus propuestas antes de aceptarlas. El historial queda en tu espacio y puedes reportar una respuesta desde la conversación.
+
+TUS ARCHIVOS, CUANDO LOS NECESITES
+Elige los documentos o imágenes que quieres guardar, consulta el catálogo y recupera sus originales. El selector de Android permite elegir archivos sin conceder acceso completo a tu galería. El asistente utiliza el contenido documental autorizado; las cuotas y los límites del servicio dependen de tu espacio.
+
+AVISOS A TU MEDIDA
+Activa seguimientos locales voluntarios y configura tus horarios de descanso. Puedes abrir el Reloj de Android para revisar un despertador. Android puede retrasar los avisos; estos seguimientos no sustituyen una alarma urgente.
+
+CONTINÚA EN TU ESPACIO
+Si reinstalas o cambias de teléfono, solicita un nuevo código para reconectar al mismo espacio y recuperar el contenido que permanece en el servidor. Desinstalar la app o desconectarla no elimina tu cuenta.
+
+PRIVACIDAD Y CONTROL
+Los espacios están separados y las conexiones usan HTTPS. El contenido se almacena cifrado en el servidor y en los respaldos. El asistente procesa mensajes y contexto autorizado en la infraestructura del servicio; el operador tiene acceso técnico al contenido. Esto no es cifrado de extremo a extremo frente al operador. Puedes solicitar la eliminación de tu espacio y los datos asociados desde los enlaces de soporte de la app o sin iniciar sesión.
+
+AgentAgenda no muestra anuncios. Está dirigida a personas de 13 años o más. Necesita conexión para sincronizar, consultar archivos del servidor y usar el asistente. La IA puede cometer errores: revisa sus respuestas y propuestas.
+
+Soporte: pibarrafacio@gmail.com
+https://agenda-api.pedroibarra.dev/soporte
+
+Privacidad:
+https://privacy.ici-labs.com/agentagenda/

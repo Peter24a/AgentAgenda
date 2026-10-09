@@ -1,6 +1,6 @@
 # AgentAgenda para Android
 
-Actualizado: 8 de octubre de 2026. App única para todos los espacios: paquete `com.agentagenda.agent_agenda`, versión 2.0.1+6. Conserva seguimientos locales voluntarios y acceso al despertador de Android.
+Actualizado: 8 de octubre de 2026. App única para todos los espacios: paquete `com.agentagenda.agent_agenda`, versión 2.0.1+8. Conserva seguimientos locales voluntarios y acceso al despertador de Android.
 
 ## Compilar y verificar
 
@@ -72,3 +72,5 @@ Fuentes oficiales de implementación:
 - [Alarmas de Android](https://developer.android.com/develop/background-work/services/alarms): comportamiento de alarmas aproximadas y restricciones del sistema.
 
 - [flutter_secure_storage 10.3.4](https://pub.dev/packages/flutter_secure_storage/versions/10.3.4): almacenamiento cifrado y configuración Android.
+
+El icono `ic_notification` se conserva con `android/app/src/main/res/raw/agentagenda_keep.xml`, porque el plugin lo busca por nombre durante la ejecución. No desactivar la optimización de recursos para conservarlo. Comprobar su presencia en el APK release con `aapt2 dump resources` y una notificación real en el teléfono.

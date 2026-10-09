@@ -434,7 +434,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'SARA Agenda no puede comprobar si la alarma quedó activada. La alarma del Reloj funciona por separado de la conexión con el servidor.',
+                    'AgentAgenda no puede comprobar si la alarma quedó activada. La alarma del Reloj funciona por separado de la conexión con el servidor.',
                   ),
                 ],
               ),

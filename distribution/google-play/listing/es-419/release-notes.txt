@@ -1,0 +1,8 @@
+AgentAgenda 2.0.1
+• Una app para conectar tu espacio personal con un código.
+• Agenda, tareas, archivos y asistente con propuestas revisables.
+• Horarios según tu zona y controles visibles en pantallas cortas.
+• Privacidad, soporte y solicitud de eliminación accesibles.
+• Reporte de respuestas de IA con revisión antes de enviar.
+• Selector de archivos sin acceso amplio a la galería y fuentes incluidas.
+• Icono de avisos conservado en la compilación de publicación.

@@ -1,0 +1,337 @@
+{
+  "verified_at": "2026-10-08T22:03:51.880311-06:00",
+  "artifacts": [
+    {
+      "type": "AAB",
+      "path": "apps/mobile/build/app/outputs/bundle/release/app-release.aab",
+      "bytes": 61399772,
+      "sha256": "fecbd4d9f922d68af8b7ffe853b44ee36ef835eaf0d138bd9d6ab0c01b8a2c56"
+    },
+    {
+      "type": "APK",
+      "path": "apps/mobile/build/app/outputs/flutter-apk/app-release.apk",
+      "bytes": 62632859,
+      "sha256": "1acacb1e6aeaf0595d00c29152d1c718de09487918c54f99a2bfd648898b7b34"
+    }
+  ],
+  "bundletool": {
+    "version": "1.18.3",
+    "source": "https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar",
+    "sha256": "a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29",
+    "github_digest_matched": true,
+    "validate_exit_code": 0,
+    "build_apks_exit_code": 0
+  },
+  "manifest": {
+    "package": "com.agentagenda.agent_agenda",
+    "version_name": "2.0.1",
+    "version_code": "6",
+    "min_sdk": "24",
+    "target_sdk": "36",
+    "permissions": [
+      "android.permission.INTERNET",
+      "android.permission.POST_NOTIFICATIONS",
+      "android.permission.RECEIVE_BOOT_COMPLETED",
+      "com.android.alarm.permission.SET_ALARM",
+      "android.permission.VIBRATE",
+      "com.agentagenda.agent_agenda.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+    ],
+    "allow_backup": "false",
+    "uses_cleartext_traffic": "false",
+    "extract_native_libs": "false"
+  },
+  "signing": {
+    "production_certificate_sha256": "35e555ba23217ca7b9565e94b732e3974e6f77e15e9f32496d18d3a507dab69f",
+    "aab_jarfile_payloads": 356,
+    "aab_jarfile_verified_payloads": 356,
+    "aab_jarfile_unsigned_payloads": 0,
+    "aab_jarinputstream_manifest_detected": false,
+    "aab_jarinputstream_verified_payloads": 0,
+    "payload_difference_between_readers": 0,
+    "manifest_zip_entry_index": 358,
+    "duplicate_zip_names": false,
+    "zip_symlinks": 0,
+    "certificate_valid_until": "2054-02-23",
+    "apk_apksigner_exit_code": 0,
+    "warnings": [
+      "JAR manifest/signatures occur after payload entries, so JarInputStream does not initialize verification; JarFile validates every payload.",
+      "Certificate is self-signed and signature has no timestamp, standard characteristics of this Android upload certificate.",
+      "POSIX file attributes are outside JAR signature coverage; no symlinks or duplicate ZIP paths detected."
+    ]
+  },
+  "page_size_16kb": {
+    "bundle_alignment": "PAGE_ALIGNMENT_16K",
+    "native_libraries": [
+      {
+        "library": "base/lib/arm64-v8a/libapp.so",
+        "load_alignments": [
+          65536,
+          65536,
+          65536
+        ],
+        "minimum_alignment": 65536,
+        "passed_16kb": true
+      },
+      {
+        "library": "base/lib/arm64-v8a/libdartjni.so",
+        "load_alignments": [
+          16384,
+          16384,
+          16384
+        ],
+        "minimum_alignment": 16384,
+        "passed_16kb": true
+      },
+      {
+        "library": "base/lib/arm64-v8a/libdatastore_shared_counter.so",
+        "load_alignments": [
+          16384,
+          16384,
+          16384
+        ],
+        "minimum_alignment": 16384,
+        "passed_16kb": true
+      },
+      {
+        "library": "base/lib/arm64-v8a/libflutter.so",
+        "load_alignments": [
+          65536,
+          65536,
+          65536
+        ],
+        "minimum_alignment": 65536,
+        "passed_16kb": true
+      },
+      {
+        "library": "base/lib/armeabi-v7a/libapp.so",
+        "load_alignments": [
+          16384,
+          16384,
+          16384
+        ],
+        "minimum_alignment": 16384,
+        "passed_16kb": true
+      },
+      {
+        "library": "base/lib/armeabi-v7a/libdartjni.so",
+        "load_alignments": [
+          16384,
+          16384,
+          16384
+        ],
+        "minimum_alignment": 16384,
+        "passed_16kb": true
+      },
+      {
+        "library": "base/lib/armeabi-v7a/libdatastore_shared_counter.so",
+        "load_alignments": [
+          16384,
+          16384
+        ],
+        "minimum_alignment": 16384,
+        "passed_16kb": true
+      },
+      {
+        "library": "base/lib/armeabi-v7a/libflutter.so",
+        "load_alignments": [
+          65536,
+          65536,
+          65536
+        ],
+        "minimum_alignment": 65536,
+        "passed_16kb": true
+      },
+      {
+        "library": "base/lib/x86_64/libapp.so",
+        "load_alignments": [
+          65536,
+          65536,
+          65536
+        ],
+        "minimum_alignment": 65536,
+        "passed_16kb": true
+      },
+      {
+        "library": "base/lib/x86_64/libdartjni.so",
+        "load_alignments": [
+          16384,
+          16384,
+          16384
+        ],
+        "minimum_alignment": 16384,
+        "passed_16kb": true
+      },
+      {
+        "library": "base/lib/x86_64/libdatastore_shared_counter.so",
+        "load_alignments": [
+          16384,
+          16384
+        ],
+        "minimum_alignment": 16384,
+        "passed_16kb": true
+      },
+      {
+        "library": "base/lib/x86_64/libflutter.so",
+        "load_alignments": [
+          65536,
+          65536,
+          65536
+        ],
+        "minimum_alignment": 65536,
+        "passed_16kb": true
+      }
+    ],
+    "release_apk_zipalign_exit_code": 0,
+    "derived_apks": 255,
+    "derived_native_apks": 9,
+    "derived_apks_all_zipalign_passed": true,
+    "derived_apks_signing": "Temporary default debug certificate for packaging validation only; release AAB/APK unchanged.",
+    "runtime_16kb_tested": false,
+    "relro_end_alignment_review": {
+      "results": [
+        {
+          "library": "base/lib/arm64-v8a/libapp.so",
+          "relro_segments": [],
+          "end_alignment_check_passed": true
+        },
+        {
+          "library": "base/lib/arm64-v8a/libdartjni.so",
+          "relro_segments": [
+            {
+              "virtual_address": 142352,
+              "memory_size": 5104,
+              "end": 147456,
+              "remainder_16kb": 0,
+              "aligned_16kb": true
+            }
+          ],
+          "end_alignment_check_passed": true
+        },
+        {
+          "library": "base/lib/arm64-v8a/libdatastore_shared_counter.so",
+          "relro_segments": [
+            {
+              "virtual_address": 20928,
+              "memory_size": 3648,
+              "end": 24576,
+              "remainder_16kb": 8192,
+              "aligned_16kb": false
+            }
+          ],
+          "end_alignment_check_passed": false
+        },
+        {
+          "library": "base/lib/arm64-v8a/libflutter.so",
+          "relro_segments": [
+            {
+              "virtual_address": 11435760,
+              "memory_size": 373008,
+              "end": 11808768,
+              "remainder_16kb": 12288,
+              "aligned_16kb": false
+            }
+          ],
+          "end_alignment_check_passed": false
+        },
+        {
+          "library": "base/lib/armeabi-v7a/libapp.so",
+          "relro_segments": [],
+          "end_alignment_check_passed": true
+        },
+        {
+          "library": "base/lib/armeabi-v7a/libdartjni.so",
+          "relro_segments": [
+            {
+              "virtual_address": 94640,
+              "memory_size": 3664,
+              "end": 98304,
+              "remainder_16kb": 0,
+              "aligned_16kb": true
+            }
+          ],
+          "end_alignment_check_passed": true
+        },
+        {
+          "library": "base/lib/armeabi-v7a/libdatastore_shared_counter.so",
+          "relro_segments": [
+            {
+              "virtual_address": 19088,
+              "memory_size": 1392,
+              "end": 20480,
+              "remainder_16kb": 4096,
+              "aligned_16kb": false
+            }
+          ],
+          "end_alignment_check_passed": false
+        },
+        {
+          "library": "base/lib/armeabi-v7a/libflutter.so",
+          "relro_segments": [
+            {
+              "virtual_address": 8482400,
+              "memory_size": 197024,
+              "end": 8679424,
+              "remainder_16kb": 12288,
+              "aligned_16kb": false
+            }
+          ],
+          "end_alignment_check_passed": false
+        },
+        {
+          "library": "base/lib/x86_64/libapp.so",
+          "relro_segments": [],
+          "end_alignment_check_passed": true
+        },
+        {
+          "library": "base/lib/x86_64/libdartjni.so",
+          "relro_segments": [
+            {
+              "virtual_address": 127744,
+              "memory_size": 3328,
+              "end": 131072,
+              "remainder_16kb": 0,
+              "aligned_16kb": true
+            }
+          ],
+          "end_alignment_check_passed": true
+        },
+        {
+          "library": "base/lib/x86_64/libdatastore_shared_counter.so",
+          "relro_segments": [
+            {
+              "virtual_address": 20256,
+              "memory_size": 4320,
+              "end": 24576,
+              "remainder_16kb": 8192,
+              "aligned_16kb": false
+            }
+          ],
+          "end_alignment_check_passed": false
+        },
+        {
+          "library": "base/lib/x86_64/libflutter.so",
+          "relro_segments": [
+            {
+              "virtual_address": 12742256,
+              "memory_size": 364944,
+              "end": 13107200,
+              "remainder_16kb": 0,
+              "aligned_16kb": true
+            }
+          ],
+          "end_alignment_check_passed": true
+        }
+      ],
+      "note": "Five prebuilt library RELRO ends do not satisfy the simplified end modulo 16 KB check. LOAD alignment and real x86_64 runtime are checked separately. This is a static flag, not evidence of a runtime failure; ARM 16 KB execution remains untested."
+    }
+  },
+  "limitations": [
+    "No 16 KB runtime device/emulator was exercised by this validation.",
+    "Bundletool structure/generation and signatures do not replace Google Play policy review or actual Console acceptance.",
+    "JarInputStream cannot authenticate this archive due to the manifest ZIP ordering; immutable original remains unchanged."
+  ],
+  "sources": [
+    "https://developer.android.com/guide/practices/page-sizes",
+    "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/jar/JarInputStream.html"
+  ]
+}

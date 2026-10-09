@@ -1,0 +1,164 @@
+{
+  "updated_at": "2026-10-09T04:50:23.261082+00:00",
+  "status": "complete_physical_qa_passed_personal_recovery_verified",
+  "device": {
+    "model": "Pixel 10 Pro XL",
+    "android_version": "17",
+    "api_level": 37,
+    "page_size_bytes": 4096,
+    "native_screen_pixels": [
+      1080,
+      2404
+    ],
+    "density_dpi": 390,
+    "physical_device": true,
+    "validates_16kb_pages": false,
+    "abi": "arm64-v8a",
+    "min_sdk": 24,
+    "target_sdk": 36
+  },
+  "package": "com.agentagenda.agent_agenda",
+  "version_name": "2.0.1",
+  "tested_version_codes": [
+    7,
+    8
+  ],
+  "signed_release_installed_without_clearing_data": true,
+  "checks_version_7": {
+    "review_space_https_activation": "passed",
+    "agenda_week_and_day_fake_data": "passed",
+    "chat_new_ai_response": "passed",
+    "response_report_preview_and_cancel": "passed_no_report_sent",
+    "documents_library": "passed_two_fake_documents",
+    "document_open": "android_chooser_presented_cancelled_without_external_viewer",
+    "public_privacy_link": "passed_canonical_policy_loaded_returned_to_app",
+    "cold_start_session_persistence": "passed",
+    "post_notifications_permission_request": "passed_granted_and_visible_in_app",
+    "notification_test": "failed_repeatedly_after_permission_granted",
+    "notification_failure_diagnosis": "release_aapt2_resources_missing_dynamic_ic_notification",
+    "followups_enabled": false,
+    "android_active_test_notification": "absent_by_exact_own_package_test_notification_key"
+  },
+  "checks_version_8": {
+    "install_r_retained_demo_session": "passed",
+    "production_signed_release": "verified_before_install",
+    "release_dynamic_notification_icon": "present",
+    "notification_permission": "retained_granted",
+    "notification_test_button": "passed_success_message",
+    "android_active_test_notification": "passed_exact_own_package_test_key_returned_expected_title_and_body",
+    "notification_query_scope": "only_the_app_fixed_test_notification_no_other_apps",
+    "public_privacy_link": "passed_exact_canonical_url_and_loaded_public_policy_content",
+    "followups_enabled_during_demo": false,
+    "no_camera_microphone_or_broad_permissions_requested": true,
+    "support_and_deletion_links": "https_http_200_public_support_page_deletion_anchor_email_verified_browser_user_agent_no_request_sent"
+  },
+  "personal_recovery": {
+    "status": "restored",
+    "https_activation": "passed",
+    "expected_space_identity": "matched_privately",
+    "cold_restart_session_persistence": "passed",
+    "agenda_visible_after_cold_restart": true,
+    "private_content_captured": false,
+    "private_document_or_chat_mutations_performed": false,
+    "server_counter_confirmation": "passed_table_totals_preserved_no_loss_or_purge",
+    "exact_activation_receipt_device_and_configured_owner_correlation": "passed_verified_privately_on_server",
+    "current_android_session_active_and_auth_valid": true
+  },
+  "screenshots": [
+    {
+      "path": "physical-screenshots/00-activacion-pixel.png",
+      "width": 1080,
+      "height": 2404,
+      "mode": "RGB",
+      "pixel_dimensions_changed": false,
+      "google_play_aspect_ratio_eligible": false
+    },
+    {
+      "path": "physical-screenshots/01-agenda-semana-pixel.png",
+      "width": 1080,
+      "height": 2404,
+      "mode": "RGB",
+      "pixel_dimensions_changed": false,
+      "google_play_aspect_ratio_eligible": false
+    },
+    {
+      "path": "physical-screenshots/02-chat-sara-pixel.png",
+      "width": 1080,
+      "height": 2404,
+      "mode": "RGB",
+      "pixel_dimensions_changed": false,
+      "google_play_aspect_ratio_eligible": false
+    },
+    {
+      "path": "physical-screenshots/03-reporte-preview-pixel.png",
+      "width": 1080,
+      "height": 2404,
+      "mode": "RGB",
+      "pixel_dimensions_changed": false,
+      "google_play_aspect_ratio_eligible": false
+    },
+    {
+      "path": "physical-screenshots/04-archivos-pixel.png",
+      "width": 1080,
+      "height": 2404,
+      "mode": "RGB",
+      "pixel_dimensions_changed": false,
+      "google_play_aspect_ratio_eligible": false
+    },
+    {
+      "path": "physical-screenshots/05-privacidad-aviso-pixel.png",
+      "width": 1080,
+      "height": 2404,
+      "mode": "RGB",
+      "pixel_dimensions_changed": false,
+      "google_play_aspect_ratio_eligible": false
+    },
+    {
+      "path": "physical-screenshots/06-avisos-permiso-inicial-pixel.png",
+      "width": 1080,
+      "height": 2404,
+      "mode": "RGB",
+      "pixel_dimensions_changed": false,
+      "google_play_aspect_ratio_eligible": false
+    },
+    {
+      "path": "physical-screenshots/07-avisos-permiso-concedido-pixel.png",
+      "width": 1080,
+      "height": 2404,
+      "mode": "RGB",
+      "pixel_dimensions_changed": false,
+      "google_play_aspect_ratio_eligible": false
+    },
+    {
+      "path": "physical-screenshots/08-avisos-prueba-pixel.png",
+      "width": 1080,
+      "height": 2404,
+      "mode": "RGB",
+      "pixel_dimensions_changed": false,
+      "google_play_aspect_ratio_eligible": false
+    },
+    {
+      "path": "physical-screenshots/09-avisos-resultado-inmediato-pixel.png",
+      "width": 1080,
+      "height": 2404,
+      "mode": "RGB",
+      "pixel_dimensions_changed": false,
+      "google_play_aspect_ratio_eligible": false
+    },
+    {
+      "path": "physical-screenshots/10-version8-avisos-prueba-pixel.png",
+      "width": 1080,
+      "height": 2404,
+      "mode": "RGB",
+      "pixel_dimensions_changed": false,
+      "google_play_aspect_ratio_eligible": false
+    }
+  ],
+  "screenshot_use": "internal_physical_QA_only_native_ratio_exceeds_Google_Play_2_to_1_limit",
+  "privacy": {
+    "synthetic_content_only_in_screenshots": true,
+    "no_activation_codes_tokens_device_serials_or_customer_identifiers_in_this_report": true,
+    "no_support_or_deletion_requests_sent": true
+  },
+  "installed_version_code": 8
+}
