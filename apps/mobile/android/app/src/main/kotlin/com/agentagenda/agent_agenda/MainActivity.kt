@@ -2,6 +2,7 @@ package com.agentagenda.agent_agenda
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.net.Uri
 import android.provider.AlarmClock
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -11,6 +12,28 @@ import java.util.ArrayList
 class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "agent_agenda/service_links")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "openHttps") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                val raw = call.argument<String>("url")
+                val uri = raw?.let { Uri.parse(it) }
+                if (uri == null || uri.scheme != "https" || uri.host.isNullOrEmpty() ||
+                    uri.userInfo != null) {
+                    result.error("INVALID_URL", "Se requiere una dirección HTTPS.", null)
+                    return@setMethodCallHandler
+                }
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, uri))
+                    result.success(true)
+                } catch (_: ActivityNotFoundException) {
+                    result.success(false)
+                } catch (_: SecurityException) {
+                    result.success(false)
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "agent_agenda/system_clock")
             .setMethodCallHandler { call, result ->
                 if (call.method != "setAlarm") {

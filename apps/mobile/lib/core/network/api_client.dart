@@ -33,7 +33,8 @@ class ChatProposalEvent extends ChatStreamEvent {
 }
 
 class ChatDoneEvent extends ChatStreamEvent {
-  const ChatDoneEvent();
+  final String? messageId;
+  const ChatDoneEvent({this.messageId});
 }
 
 class ChatErrorEvent extends ChatStreamEvent {
@@ -41,11 +42,33 @@ class ChatErrorEvent extends ChatStreamEvent {
   const ChatErrorEvent(this.message);
 }
 
+enum AiReportReason {
+  harmful('Contenido dañino o inapropiado'),
+  privacy('Privacidad o datos personales'),
+  inaccurate('Información incorrecta'),
+  other('Otro motivo');
+
+  final String label;
+  const AiReportReason(this.label);
+}
+
 /// Cliente HTTP principal para la API canónica de AgentAgenda.
 /// Proporciona acceso a Agenda, Propuestas del Agente, Tareas y Chat Streaming.
 class ApiClient {
   static final ApiClient instance = ApiClient._();
   ApiClient._();
+
+  @visibleForTesting
+  ApiClient.forTesting({
+    required http.Client client,
+    required String baseUrl,
+    required String token,
+  }) {
+    if (kReleaseMode) throw StateError('Use activation to connect.');
+    _client = client;
+    _testBaseUrl = baseUrl;
+    _testToken = token;
+  }
 
   static String get defaultPlatformUrl => defaultAgendaServer;
   final SpaceSessionManager sessions = SpaceSessionManager.instance;
@@ -564,6 +587,33 @@ class ApiClient {
   // CHAT & STREAMING
   // ==========================================
 
+  /// Send only the reviewed response identifier and the user's report fields.
+  /// The server verifies ownership and obtains the selected saved response.
+  Future<void> reportAiResponse({
+    required String messageId,
+    required AiReportReason reason,
+    String? details,
+  }) async {
+    final comment = details?.trim();
+    if (messageId.trim().isEmpty || (comment?.length ?? 0) > 2000) {
+      throw ArgumentError(
+        'Selecciona una respuesta y usa hasta 2000 caracteres.',
+      );
+    }
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/v1/chat/reports'),
+          headers: _headers,
+          body: jsonEncode({
+            'message_id': messageId,
+            'reason': reason.name,
+            if (comment != null && comment.isNotEmpty) 'details': comment,
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
+    _requireSuccess(response);
+  }
+
   /// Recupera el historial de mensajes persistentes del chat durable.
   Future<List<Map<String, dynamic>>> getChatMessages({int limit = 50}) async {
     final uri = Uri.parse('$baseUrl/v1/chat/messages?limit=$limit');
@@ -682,7 +732,9 @@ class ApiClient {
             yield ChatProposalEvent(_proposalFromJson(propData));
           } else if (type == 'done') {
             terminalEvent = true;
-            yield const ChatDoneEvent();
+            yield ChatDoneEvent(
+              messageId: json['assistant_message_id'] as String?,
+            );
           } else if (type == 'error') {
             terminalEvent = true;
             yield ChatErrorEvent(

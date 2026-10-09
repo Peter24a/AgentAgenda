@@ -1,0 +1,1 @@
+Inter and Manrope are bundled for offline use. These font files are the exact SHA-256 checked variants from google_fonts 8.2.1 (fonts.gstatic.com). Runtime font fetching is disabled. Their SIL Open Font Licenses are included and registered in the app.

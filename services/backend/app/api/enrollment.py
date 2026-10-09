@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from cryptography.fernet import Fernet
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db_session
@@ -88,10 +88,12 @@ async def internal_enroll(req: EnrollmentRequest, session: AsyncSession = Depend
 
 
 @router.get("/metrics")
-async def metrics(x_enrollment_key: str | None = Header(default=None)):
+async def metrics(x_enrollment_key: str | None = Header(default=None), session: AsyncSession = Depends(get_db_session)):
     secret = settings.platform_enrollment_key.get_secret_value()
     if not secret or not x_enrollment_key or not hmac.compare_digest(secret.encode(), x_enrollment_key.encode()):
         raise HTTPException(403, "Acceso interno denegado")
     from app.services.document_storage import document_storage
+    from app.models.canonical import ChatResponseReport
     usage = await asyncio.to_thread(document_storage.storage_usage_bytes)
-    return {"usage_bytes": usage, "quota_bytes": settings.storage_quota_bytes, "health": "ready"}
+    pending_reports = await session.scalar(select(func.count(ChatResponseReport.id)).where(ChatResponseReport.status == "received"))
+    return {"usage_bytes": usage, "quota_bytes": settings.storage_quota_bytes, "health": "ready", "pending_ai_reports": pending_reports or 0}

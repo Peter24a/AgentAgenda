@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/network/space_session.dart' as session;
+import '../../core/service_links.dart';
 
 class ActivationScreen extends StatefulWidget {
   final session.SpaceSessionManager manager;
@@ -153,6 +154,8 @@ class _ActivationScreenState extends State<ActivationScreen> {
                         _busy ? 'Conectando…' : 'Conectar mi espacio',
                       ),
                     ),
+                    const SizedBox(height: 24),
+                    const ServiceLinks(),
                   ],
                 ),
               ),

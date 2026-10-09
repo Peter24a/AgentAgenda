@@ -1,6 +1,6 @@
 # AgentAgenda para Android
 
-Actualizado: 8 de octubre de 2026. App única para todos los espacios: paquete `com.agentagenda.agent_agenda`, versión 2.0.0+5. Conserva seguimientos locales voluntarios y acceso al despertador de Android.
+Actualizado: 8 de octubre de 2026. App única para todos los espacios: paquete `com.agentagenda.agent_agenda`, versión 2.0.1+6. Conserva seguimientos locales voluntarios y acceso al despertador de Android.
 
 ## Compilar y verificar
 
@@ -12,6 +12,7 @@ flutter analyze
 flutter test
 flutter build apk --debug
 flutter build apk --release
+flutter build appbundle --release
 ```
 
 Los APK quedan en `build/app/outputs/flutter-apk/`. Una compilación release requiere `android/key.properties` con `storeFile`, `storePassword`, `keyAlias` y `keyPassword` del keystore de producción. El archivo y el keystore están excluidos de Git; no se permite firmar release con la clave debug. El mismo APK sirve para todos: no contiene tokens, invitaciones ni nombres de clientes. Compilar no instala el APK ni activa avisos o alarmas.
@@ -27,6 +28,16 @@ En **Ajustes → Tu espacio** se muestra el nombre del espacio y la conexión re
 Reinstalar elimina el acceso local. Un nuevo código para **el mismo espacio existente** recupera agenda, chat y documentos del servidor; nunca se crea otra agenda automáticamente. Los antiguos tokens en preferencias se eliminan al actualizar. Las instalaciones anteriores firmadas con una clave debug o con el paquete de Walter deben desinstalarse antes de instalar el APK general; el contenido del servidor permanece.
 
 Las pruebas `space_session_test.dart`, `widget_test.dart` y `notifications/follow_up_service_test.dart` cubren activación, pérdida de respuesta, persistencia, identidad, códigos vencidos, límites de URL, renovación, cierre de pantallas privadas, cambio de espacio y sincronizaciones antiguas en vuelo. La activación y entrega de avisos en un teléfono real siguen requiriendo verificación física.
+
+## Privacidad, soporte y reportes de IA
+
+Activación y **Ajustes** ofrecen enlaces a [privacidad](https://privacy.ici-labs.com/agentagenda/), [soporte](https://agenda-api.pedroibarra.dev/soporte) y [solicitud de eliminación de datos](https://agenda-api.pedroibarra.dev/soporte#eliminacion), que se abren en el navegador del teléfono. Se informa que la IA procesa los mensajes y los documentos autorizados en el servidor; las respuestas y propuestas requieren revisión del usuario.
+
+Cada respuesta de asistente guardada ofrece **Reportar respuesta**. Un diálogo muestra la respuesta exacta, permite elegir motivo y comentario opcional de hasta 2000 caracteres, y explica qué se comparte con soporte. Únicamente al pulsar **Enviar reporte** se llama a `POST /s/<space_id>/v1/chat/reports` con `message_id`, `reason` y `details` opcional. La app no envía el historial completo. El servidor verifica propiedad y utiliza la respuesta guardada; al terminar el stream devuelve `assistant_message_id` para permitir el reporte inmediatamente. Los fallos conservan el comentario para reintentar. `ai_report_test.dart` verifica el destino aislado, credenciales, campos, límites y errores.
+
+Fotos y documentos se eligen mediante el selector de Android. Las descargas se abren desde almacenamiento privado con FileProvider. El manifiesto elimina los permisos amplios de almacenamiento y `READ_MEDIA_*` que agregan algunas dependencias; no se requiere acceso completo a la galería.
+
+Inter y Manrope se incluyen en `assets/fonts/`, con variantes verificadas contra los hashes SHA-256 del paquete `google_fonts` 8.2.1 y sus licencias SIL Open Font License. Se desactiva la descarga de fuentes en ejecución para evitar depender de conexión o contactar a Google para obtenerlas. **Ajustes → Licencias de código abierto** incluye estas licencias.
 
 ## Seguimientos locales
 

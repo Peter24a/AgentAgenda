@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +12,15 @@ from app.models.sync import (
     SyncPullResponse, ChangeItem, SyncBootstrapResponse, SyncAckRequest,
     SyncAckResponse, OperationReceiptResponse
 )
+
+def _parse_sync_instant(value: str) -> datetime:
+    """Canonical DateTime columns store UTC without a timezone offset.
+
+    Keep the original operation payload intact for receipts and change replay.
+    Legacy strings without an offset already represent canonical UTC.
+    """
+    parsed = datetime.fromisoformat(value)
+    return parsed.astimezone(timezone.utc).replace(tzinfo=None) if parsed.tzinfo else parsed
 
 
 class SyncService:
@@ -182,8 +191,8 @@ class SyncService:
                     current_server_state={"title": event.title, "version": event.version}
                 ), None, None
 
-            start_dt = datetime.fromisoformat(op.payload["start_time"]) if "start_time" in op.payload else datetime.utcnow()
-            end_dt = datetime.fromisoformat(op.payload["end_time"]) if op.payload.get("end_time") else None
+            start_dt = _parse_sync_instant(op.payload["start_time"]) if "start_time" in op.payload else datetime.utcnow()
+            end_dt = _parse_sync_instant(op.payload["end_time"]) if op.payload.get("end_time") else None
 
             if event and event.is_deleted:
                 event.title = op.payload.get("title", "Sin título")
@@ -245,9 +254,9 @@ class SyncService:
             if "description" in op.payload:
                 event.description = op.payload["description"]
             if "start_time" in op.payload:
-                event.start_time = datetime.fromisoformat(op.payload["start_time"])
+                event.start_time = _parse_sync_instant(op.payload["start_time"])
             if "end_time" in op.payload:
-                event.end_time = datetime.fromisoformat(op.payload["end_time"]) if op.payload["end_time"] else None
+                event.end_time = _parse_sync_instant(op.payload["end_time"]) if op.payload["end_time"] else None
             if "category" in op.payload:
                 event.category = op.payload["category"]
             if "is_completed" in op.payload:
@@ -329,7 +338,7 @@ class SyncService:
                     error_message="La tarea ya existe en el servidor"
                 ), None, None
 
-            due_dt = datetime.fromisoformat(op.payload["due_date"]) if op.payload.get("due_date") else None
+            due_dt = _parse_sync_instant(op.payload["due_date"]) if op.payload.get("due_date") else None
             task = Task(
                 id=op.entity_id,
                 user_id=user_id,
@@ -380,7 +389,7 @@ class SyncService:
             if "priority" in op.payload:
                 task.priority = op.payload["priority"]
             if "due_date" in op.payload:
-                task.due_date = datetime.fromisoformat(op.payload["due_date"]) if op.payload["due_date"] else None
+                task.due_date = _parse_sync_instant(op.payload["due_date"]) if op.payload["due_date"] else None
 
             task.version += 1
             await session.flush()
@@ -523,8 +532,8 @@ class SyncService:
                 ), None, None
 
             now = datetime.utcnow()
-            valid_from = datetime.fromisoformat(op.payload["valid_from"]) if op.payload.get("valid_from") else None
-            valid_to = datetime.fromisoformat(op.payload["valid_to"]) if op.payload.get("valid_to") else None
+            valid_from = _parse_sync_instant(op.payload["valid_from"]) if op.payload.get("valid_from") else None
+            valid_to = _parse_sync_instant(op.payload["valid_to"]) if op.payload.get("valid_to") else None
 
             if mem:
                 mem.memory_type = op.payload.get("memory_type", "semantic")
@@ -590,8 +599,10 @@ class SyncService:
                 mem.context_text = op.payload["context_text"]
             if "predicate" in op.payload:
                 mem.predicate = op.payload["predicate"]
+            if "valid_from" in op.payload:
+                mem.valid_from = _parse_sync_instant(op.payload["valid_from"]) if op.payload["valid_from"] else None
             if "valid_to" in op.payload:
-                mem.valid_to = datetime.fromisoformat(op.payload["valid_to"]) if op.payload["valid_to"] else None
+                mem.valid_to = _parse_sync_instant(op.payload["valid_to"]) if op.payload["valid_to"] else None
 
             mem.version += 1
             mem.updated_at = datetime.utcnow()

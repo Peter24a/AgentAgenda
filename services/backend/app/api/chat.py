@@ -4,23 +4,84 @@ from sqlalchemy import select, and_, or_, exists
 from sqlalchemy.exc import IntegrityError
 import json
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_auth, get_db_session, require_scope
+from app.api.deps import get_current_auth, get_db_session, get_explicit_auth, has_scope, require_scope
 from app.models.auth import AuthContext
 from app.models.chat import (
     ChatMessageResponse,
     ChatWindowResponse,
     CheckInRequest,
     ChatRequest,
+    ChatReportRequest,
+    ChatReportResponse,
     ChatTurnResponse,
     CreateTurnRequest,
 )
 from app.services.chat_orchestrator import chat_orchestrator
 
 router = APIRouter(prefix="/v1/chat", tags=["Durable Chat & LLM"])
+
+
+@router.post("/reports", response_model=ChatReportResponse, status_code=201)
+async def report_assistant_response(
+    req: ChatReportRequest,
+    response: Response,
+    session: AsyncSession = Depends(get_db_session),
+    auth: AuthContext = Depends(get_explicit_auth),
+):
+    """Accept feedback for an assistant message visible in the owner's history."""
+    from app.models.canonical import ChatMessage, ChatResponseReport
+    if not auth.device_id or not all(has_scope(auth, scope) for scope in ("chat:read", "chat:write")):
+        raise HTTPException(403, "Se requiere un dispositivo con acceso de lectura y escritura al chat")
+    message = await session.scalar(select(ChatMessage).where(
+        ChatMessage.id == req.message_id,
+        ChatMessage.user_id == auth.user_id,
+        ChatMessage.role == "assistant",
+    ))
+    if not message:
+        # Foreign, missing, and non-assistant IDs have the same response.
+        raise HTTPException(404, "Respuesta del asistente no encontrada")
+    filters = (
+        ChatResponseReport.user_id == auth.user_id,
+        ChatResponseReport.device_id == auth.device_id,
+        ChatResponseReport.message_id == message.id,
+    )
+    details = req.details or None
+    report = await session.scalar(select(ChatResponseReport).where(*filters))
+    if not report:
+        report = ChatResponseReport(
+            id="report-" + uuid.uuid4().hex,
+            user_id=auth.user_id,
+            device_id=auth.device_id,
+            message_id=message.id,
+            reason=req.reason,
+            details=details,
+            status="received",
+        )
+        session.add(report)
+        try:
+            await session.commit()
+        except IntegrityError:
+            # Retry after a response lost in transit must not duplicate reports.
+            await session.rollback()
+            report = await session.scalar(select(ChatResponseReport).where(*filters))
+            if not report:
+                raise
+            response.status_code = 200
+    else:
+        response.status_code = 200
+    if report.reason != req.reason or report.details != details:
+        raise HTTPException(409, "Ya reportaste esta respuesta desde este dispositivo")
+    return ChatReportResponse(
+        id=report.id,
+        message_id=report.message_id,
+        reason=report.reason,
+        status=report.status,
+        created_at=report.created_at.replace(tzinfo=timezone.utc),
+    )
 
 
 def _can_read_documents(auth: AuthContext) -> bool:

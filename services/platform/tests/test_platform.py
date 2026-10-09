@@ -45,7 +45,8 @@ def platform(tmp_path):
             expected_secret = "secret-" + host.removeprefix("backend-") + "-" + "z" * 40
             assert request.headers["x-enrollment-key"] == expected_secret
             state["enroll_calls"].append(body)
-            result = state["receipts"].setdefault(body["operation_id"], {"device_id": "new-device-" + host, "access_token": "access-" + host, "refresh_token": "refresh-" + host, "expires_in": 3600, "token_type": "bearer", "scopes": ["agenda:read", "agenda:write"]})
+            identity_suffix = host + "-" + body["operation_id"] if host == "backend-8400" else host
+            result = state["receipts"].setdefault(body["operation_id"], {"device_id": "new-device-" + identity_suffix, "access_token": "access-" + identity_suffix, "refresh_token": "refresh-" + identity_suffix, "expires_in": 3600, "token_type": "bearer", "scopes": ["agenda:read", "agenda:write"]})
             if state["fail_after_enroll"]:
                 state["fail_after_enroll"] = False
                 raise httpx.ReadError("Synthetic lost enrollment response", request=request)
@@ -53,6 +54,11 @@ def platform(tmp_path):
         if request.url.path == "/health":
             return httpx.Response(200, json={"status": "ok", "private": "do not expose"})
         if request.url.path == "/v1/auth/me":
+            if host == "backend-8400":
+                matching = next((value for value in state["receipts"].values() if bearer == "Bearer " + value["access_token"] and host in value["access_token"]), None)
+                if not matching:
+                    return httpx.Response(401, json={"detail": "bad token"})
+                return httpx.Response(200, json={"user_id": "default_user", "device_id": matching["device_id"], "token_id": "token", "scopes": ["agenda:read"]})
             if bearer != "Bearer access-" + host:
                 return httpx.Response(401, json={"detail": "bad token"})
             return httpx.Response(200, json={"user_id": "default_user", "device_id": "new-device-" + host, "token_id": "token", "scopes": ["agenda:read"]})
@@ -63,6 +69,8 @@ def platform(tmp_path):
             return httpx.Response(200, json={"access_token": "access-" + host, "refresh_token": "refresh-" + host, "expires_in": 3600, "scopes": []})
         if request.url.path == "/v1/devices":
             return httpx.Response(200, json={"devices": [{"id": "new-device-" + host, "device_name": "Test"}]})
+        if request.url.path == "/internal/metrics":
+            return httpx.Response(200, json={"usage_bytes": 123, "quota_bytes": 5000, "health": "ready", "pending_ai_reports": 2, "report_details": "Synthetic private report", "message_id": "private-message"})
         if request.url.path == "/v1/chat/stream":
             return httpx.Response(200, headers={"content-type": "text/event-stream", "x-enrollment-key": "hidden"}, stream=ByteStream(b"event: delta\ndata: test\n\n"))
         if request.url.path == "/v1/documents/file":
@@ -294,3 +302,231 @@ async def test_failed_helper_never_makes_an_unconfigured_space_ready(platform, t
             assert result["state"] == "failed"
             assert registry.get_space(response.json()["id"])["state"] == "failed"
             assert (await client.get("/s/" + response.json()["id"] + "/health")).status_code == 423
+
+
+@pytest.fixture
+def review_platform(platform):
+    original, registry, personal, walter, state = platform
+    review = registry.create_space("Google Play review", "Synthetic review account")
+    registry.configure_space(review["id"], "http://backend-8400", "default_user", "secret-8400-" + "z" * 40)
+    registry.set_space_state(review["id"], "ready")
+    cfg = original.state.settings.model_copy(update={"review_space_id": review["id"]})
+    app = create_app(cfg, registry, original.state.client._transport)
+    credential = registry.create_review_credential(review["id"], cfg.review_space_id)
+    return app, registry, personal, walter, review, credential, state
+
+
+async def test_review_code_reusable_new_installs_and_idempotent_retry(review_platform):
+    app, registry, personal, walter, review, credential, state = review_platform
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        first, body = await activate(client, registry, review, code=credential["code"])
+        assert first.status_code == 200
+        retry = await client.post("/platform/v1/activate", json=body)
+        assert retry.json() == first.json()
+        assert len(state["enroll_calls"]) == 1
+        # Client-supplied space/device selection never expands review access.
+        second = await client.post("/platform/v1/activate", json={**body, "request_id": str(uuid.uuid4()), "device_name": "Another reviewer", "space_id": personal["id"], "client_device_id": "some-other-device"})
+        assert second.status_code == 200
+        assert second.json()["space_id"] == review["id"]
+        assert first.json()["device_id"] != second.json()["device_id"]
+        assert first.json()["access_token"] != second.json()["access_token"]
+        assert len({call["operation_id"] for call in state["enroll_calls"]}) == 2
+        assert all(call["client_device_id"] is None for call in state["enroll_calls"])
+        assert all(request.url.host == "backend-8400" for request in state["requests"])
+        headers = {"Authorization": "Bearer " + first.json()["access_token"]}
+        for space in (personal, walter):
+            assert (await client.get("/s/" + space["id"] + "/v1/agenda", headers=headers)).status_code == 401
+        assert (await client.get("/control/v1/spaces", headers=headers)).status_code == 401
+    with registry.connect() as db:
+        credential_row = db.execute("SELECT * FROM review_credentials").fetchone()
+        assert credential["code"] not in credential_row["code_hash"]
+        rows = db.execute("SELECT * FROM review_activations").fetchall()
+        assert len(rows) == 2
+        assert all("access-" not in row["result"] for row in rows)
+        assert registry.open(rows[0]["result"])["access_token"] == first.json()["access_token"]
+
+
+async def test_review_code_changed_fingerprint_cannot_replay(review_platform):
+    app, registry, _, _, review, credential, state = review_platform
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        first, body = await activate(client, registry, review, code=credential["code"])
+        assert first.status_code == 200
+        for update in ({"device_name": "Different"}, {"platform": "ios"}, {"client_device_id": "another-id"}):
+            assert (await client.post("/platform/v1/activate", json={**body, **update})).status_code == 409
+        assert len(state["enroll_calls"]) == 1
+
+
+async def test_review_code_lost_response_recovers_original_operation(review_platform):
+    app, registry, _, _, review, credential, state = review_platform
+    state["fail_after_enroll"] = True
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        first, body = await activate(client, registry, review, code=credential["code"])
+        assert first.status_code == 503
+        retry = await client.post("/platform/v1/activate", json=body)
+        assert retry.status_code == 200
+        assert len(state["enroll_calls"]) == 2
+        assert len({call["operation_id"] for call in state["enroll_calls"]}) == 1
+        assert len(state["receipts"]) == 1
+
+
+async def test_concurrent_review_retry_enrolls_once(review_platform):
+    app, registry, _, _, review, credential, state = review_platform
+    body = {"code": credential["code"], "device_name": "Same retry", "platform": "android", "request_id": str(uuid.uuid4())}
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        replies = await asyncio.gather(*(client.post("/platform/v1/activate", json=body) for _ in range(4)))
+        assert all(reply.status_code == 200 for reply in replies)
+        assert all(reply.json() == replies[0].json() for reply in replies)
+        assert len(state["enroll_calls"]) == 1
+    with registry.connect() as db:
+        assert db.execute("SELECT COUNT(*) FROM review_activations").fetchone()[0] == 1
+
+
+@pytest.mark.parametrize("interruption,expected_status", [("revoke", 400), ("suspend", 423)])
+async def test_review_revocation_or_suspension_during_enrollment_cannot_emit_credentials(review_platform, interruption, expected_status):
+    original, registry, _, _, review, credential, _ = review_platform
+    underlying = original.state.client._transport.handler
+
+    async def interrupted_backend(request):
+        result = await underlying(request)
+        if request.url.path == "/internal/enroll":
+            if interruption == "revoke":
+                registry.revoke_review_credential(credential["credential_id"])
+            else:
+                registry.set_space_state(review["id"], "suspended")
+        return result
+
+    app = create_app(original.state.settings, registry, httpx.MockTransport(interrupted_backend))
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        result, _ = await activate(client, registry, review, code=credential["code"])
+        assert result.status_code == expected_status
+        assert "access_token" not in result.text and "refresh_token" not in result.text
+    with registry.connect() as db:
+        assert db.execute("SELECT result FROM review_activations").fetchone()[0] is None
+
+
+async def test_revoked_review_code_blocks_both_retries_and_new_installs(review_platform):
+    app, registry, _, _, review, credential, state = review_platform
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        first, body = await activate(client, registry, review, code=credential["code"])
+        assert first.status_code == 200
+        registry.revoke_review_credential(credential["credential_id"])
+        requests_before = len(state["requests"])
+        for request_id in (body["request_id"], str(uuid.uuid4())):
+            result = await client.post("/platform/v1/activate", json={**body, "request_id": request_id})
+            assert result.status_code == 400
+        assert len(state["requests"]) == requests_before
+
+
+@pytest.mark.parametrize("state_name", ["suspended", "closed", "failed", "provisioning"])
+async def test_unavailable_review_space_rejects_reusable_code(review_platform, state_name):
+    app, registry, _, _, review, credential, state = review_platform
+    registry.set_space_state(review["id"], state_name)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        response, _ = await activate(client, registry, review, code=credential["code"])
+        assert response.status_code == 423
+        assert not state["requests"]
+
+
+@pytest.mark.parametrize("allowlist", ["disabled", "different", "legacy"])
+async def test_review_code_allowlist_and_nonlegacy_guard(review_platform, allowlist):
+    original, registry, personal, _, review, credential, state = review_platform
+    cfg = original.state.settings
+    if allowlist != "legacy":
+        cfg = cfg.model_copy(update={"review_space_id": "" if allowlist == "disabled" else personal["id"]})
+    else:
+        with registry.connect() as db:
+            db.execute("UPDATE spaces SET legacy=0 WHERE id=?", (personal["id"],))
+            db.execute("UPDATE spaces SET legacy=1 WHERE id=?", (review["id"],))
+    app = create_app(cfg, registry, original.state.client._transport)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        response, _ = await activate(client, registry, review, code=credential["code"])
+        assert response.status_code == 400
+        assert not state["requests"]
+
+
+async def test_review_creation_requires_ready_explicitly_allowlisted_nonlegacy_space(platform):
+    _, registry, personal, walter, _ = platform
+    from app.registry import RegistryError
+    for target, allowed in ((walter["id"], ""), (walter["id"], personal["id"]), (personal["id"], personal["id"])):
+        with pytest.raises(RegistryError):
+            registry.create_review_credential(target, allowed)
+    registry.set_space_state(walter["id"], "suspended")
+    with pytest.raises(RegistryError):
+        registry.create_review_credential(walter["id"], walter["id"])
+    with registry.connect() as db:
+        assert db.execute("SELECT COUNT(*) FROM review_credentials").fetchone()[0] == 0
+
+
+async def test_review_rotation_and_ordinary_single_use_invitation_remain_separate(review_platform):
+    app, registry, personal, _, review, old, _ = review_platform
+    ordinary = registry.create_invitation(personal["id"], "enroll", 60)
+    new = registry.create_review_credential(review["id"], app.state.settings.review_space_id)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        assert (await activate(client, registry, review, code=old["code"]))[0].status_code == 400
+        assert (await activate(client, registry, review, code=new["code"]))[0].status_code == 200
+        first, body = await activate(client, registry, personal, code=ordinary["code"])
+        assert first.status_code == 200
+        assert (await client.post("/platform/v1/activate", json={**body, "request_id": str(uuid.uuid4())})).status_code == 409
+
+
+async def test_review_web_activation_preserves_origin_cookie_csrf_boundaries(review_platform):
+    app, registry, _, _, review, credential, state = review_platform
+    body = {"code": credential["code"], "device_name": "Reviewer browser", "platform": "web", "request_id": str(uuid.uuid4())}
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        assert (await client.post("/platform/v1/activate", json=body)).status_code == 403
+        assert (await client.post("/platform/v1/activate", json=body, headers={"Origin": "https://evil.example"})).status_code == 403
+        assert not state["requests"]
+        response = await client.post("/platform/v1/activate", json=body, headers={"Origin": ORIGIN})
+        assert response.status_code == 200
+        assert "access_token" not in response.text and "refresh_token" not in response.text
+        assert "HttpOnly" in response.headers["set-cookie"]
+        assert (await client.get("/platform/v1/session")).json()["space_id"] == review["id"]
+        assert (await client.post("/s/" + review["id"] + "/v1/agenda", json={})).status_code == 403
+
+
+async def test_public_support_policy_and_authenticated_report_metadata(platform, tmp_path):
+    app, registry, personal, _, state = platform
+    web_root = Path(app.state.settings.web_root)
+    web_root.mkdir()
+    (web_root / "support.html").write_text("<html><body>AgentAgenda support</body></html>")
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        policy = await client.get("/privacidad")
+        assert policy.status_code == 302
+        assert policy.headers["location"] == "https://privacy.ici-labs.com/agentagenda/"
+        support = await client.get("/soporte")
+        assert support.status_code == 200 and "AgentAgenda support" in support.text
+        detail_path = "/control/v1/spaces/" + personal["id"]
+        assert (await client.get(detail_path)).status_code == 401
+        await login(client)
+        detail = await client.get(detail_path)
+        assert detail.status_code == 200
+        assert detail.json()["pending_ai_reports"] == 2
+        assert detail.json()["usage_bytes"] == 123
+        assert "report_details" not in detail.text and "private-message" not in detail.text
+        assert state["requests"][-1].url.path == "/internal/metrics"
+        assert "x-enrollment-key" in state["requests"][-1].headers
+
+
+def test_review_cli_exports_private_file_and_revokes_without_printing_code(review_platform, tmp_path, monkeypatch, capsys):
+    from app import cli
+    app, registry, _, _, review, _, _ = review_platform
+    monkeypatch.setattr(cli, "Settings", lambda: app.state.settings)
+    output = tmp_path / "review-code.json"
+    monkeypatch.setattr(sys, "argv", ["cli", "create-review-code", review["id"], "--output", str(output)])
+    cli.main()
+    exported = json.loads(output.read_text())
+    stdout = capsys.readouterr().out
+    assert exported["space_id"] == review["id"] and exported["expires_at"] is None
+    assert exported["code"] not in stdout
+    assert output.stat().st_mode & 0o777 == 0o600
+    monkeypatch.setattr(sys, "argv", ["cli", "revoke-review-code", exported["credential_id"]])
+    cli.main()
+    assert json.loads(capsys.readouterr().out)["revoked"] is True
+    from app.registry import RegistryError
+    with pytest.raises(RegistryError):
+        registry.reserve_review_activation(exported["code"], str(uuid.uuid4()), "fingerprint", review["id"])
+
+
+def test_review_allowlist_requires_uuid():
+    with pytest.raises(ValueError):
+        Settings(review_space_id="not-a-space-id")

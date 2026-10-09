@@ -1,6 +1,8 @@
 from pathlib import Path
 from urllib.parse import urlsplit
+import uuid
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,6 +22,12 @@ class Settings(BaseSettings):
     operation_timeout_seconds: int = 900
     max_request_bytes: int = 104857600
     trusted_hosts: str = "agenda-api.pedroibarra.dev,localhost,127.0.0.1,testserver"
+    review_space_id: str = ""
+
+    @field_validator("review_space_id")
+    @classmethod
+    def canonical_review_space(cls, value: str) -> str:
+        return str(uuid.UUID(value)) if value else ""
 
     def validated_origin(self) -> str:
         parsed = urlsplit(self.public_base_url)

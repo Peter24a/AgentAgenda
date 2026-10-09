@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/time/canonical_timestamp.dart';
+
 /// Categorías de actividades con identidad visual Pixel.
 enum ActivityCategory {
   sleep(
@@ -127,9 +129,9 @@ class AgendaItem {
       isCancellation: json['action'] == 'delete',
       title: json['title'] as String,
       description: json['description'] as String?,
-      startTime: DateTime.parse(json['start_time'] as String).toLocal(),
+      startTime: parseCanonicalTimestamp(json['start_time'] as String),
       endTime: json['end_time'] != null
-          ? DateTime.parse(json['end_time'] as String).toLocal()
+          ? parseCanonicalTimestamp(json['end_time'] as String)
           : null,
       category: cat,
       isCompleted: json['is_completed'] as bool? ?? false,

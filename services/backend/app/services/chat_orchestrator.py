@@ -313,7 +313,7 @@ class ChatOrchestrator:
 
             await self._broadcast(
                 turn_id,
-                {"type": "done", "turn_id": turn_id, "status": "completed"},
+                {"type": "done", "turn_id": turn_id, "status": "completed", "assistant_message_id": asst_msg.id},
             )
 
         except Exception as e:
@@ -373,7 +373,7 @@ class ChatOrchestrator:
                     yield f"data: {json.dumps({'type': 'token', 'content': turn_resp.assistant_message})}\n\n"
                 if turn_resp.proposal:
                     yield f"data: {json.dumps({'type': 'proposal', 'proposal': turn_resp.proposal.model_dump(mode='json')})}\n\n"
-                yield f"data: {json.dumps({'type': 'done', 'turn_id': turn_id, 'status': 'completed'})}\n\n"
+                yield f"data: {json.dumps({'type': 'done', 'turn_id': turn_id, 'status': 'completed', 'assistant_message_id': turn_resp.assistant_message_id})}\n\n"
                 return
 
             if turn_resp.status == "failed":
@@ -417,9 +417,8 @@ class ChatOrchestrator:
         messages = msgs_res.scalars().all()
 
         user_content = next((m.content for m in messages if m.role == "user"), "")
-        asst_content = next(
-            (m.content for m in messages if m.role == "assistant"), None
-        )
+        asst_message = next((m for m in messages if m.role == "assistant"), None)
+        asst_content = asst_message.content if asst_message else None
 
         proposal_obj: Optional[AgentProposalModel] = None
         if asst_content:
@@ -433,6 +432,7 @@ class ChatOrchestrator:
             status=turn.status,
             user_message=user_content,
             assistant_message=asst_content,
+            assistant_message_id=asst_message.id if asst_message else None,
             proposal=proposal_obj,
             error_message=turn.error_message,
             created_at=turn.created_at,

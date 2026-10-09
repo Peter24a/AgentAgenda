@@ -2,6 +2,8 @@
 
 Interfaz en español, sin compilación ni dependencias externas. `public/` se sirve desde la plataforma FastAPI mediante `PLATFORM_WEB_ROOT`. `/` y `/admin` abren directamente el panel administrativo, sin portada pública; `/activar` conecta a los clientes y `/app` abre su espacio privado. Los recursos están en `/assets/`.
 
+`public/support.html` se sirve en `/soporte`. Incluye ayuda y solicitud de eliminación por correo sin exigir sesión; el formulario prepara un borrador revisable y no envía datos al servidor. `/privacidad` redirige a la política canónica `https://privacy.ici-labs.com/agentagenda/`. Su artefacto estático independiente está en `privacy/agentagenda/index.html` y se publica en el portal de privacidad existente sin reemplazar otras políticas. La política se puede leer sin JavaScript.
+
 El panel administrativo usa `/control/v1` y una sesión independiente. El dashboard privado usa `/platform/v1/session` y las rutas `/s/<space_id>/v1`. Las sesiones viven en cookies HttpOnly; JavaScript conserva únicamente los metadatos y tokens CSRF durante la sesión. No hay almacenamiento de secretos en localStorage ni visor administrativo de contenido.
 
 Incluye altas y progreso de preparación, códigos temporales, suspensión y reapertura; agenda con edición y tareas; conversación durable con SSE y confirmación de propuestas; catálogo, carga por bloques y búsqueda documental; autorización y revocación de dispositivos.

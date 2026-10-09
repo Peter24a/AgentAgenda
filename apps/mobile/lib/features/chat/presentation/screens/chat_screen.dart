@@ -6,13 +6,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../../core/service_links.dart';
+import '../widgets/ai_response_report_dialog.dart';
 import '../../../documents/document_library.dart';
 import '../../../agenda/models/agent_proposal.dart';
 import '../../../agenda/presentation/widgets/agent_proposal_card.dart';
 
 /// Mensaje en la conversación del asistente.
 class ChatMessage {
-  final String? id;
+  String? id;
   String text;
   final bool isUser;
   final DateTime timestamp;
@@ -61,6 +63,7 @@ class _ChatScreenState extends State<ChatScreen> {
   late bool _checkInPending;
   DateTime? _checkInObservedAt;
   String? _checkInActivity;
+  final Set<String> _reportedMessageIds = {};
 
   final List<ChatMessage> _messages = [
     ChatMessage(
@@ -290,6 +293,8 @@ class _ChatScreenState extends State<ChatScreen> {
           setState(() {
             assistantMessage.text = event.message;
           });
+        } else if (event is ChatDoneEvent) {
+          setState(() => assistantMessage.id = event.messageId);
         }
       }
     } catch (e) {
@@ -304,6 +309,26 @@ class _ChatScreenState extends State<ChatScreen> {
         _scrollToBottom();
       }
     }
+  }
+
+  Future<void> _reportResponse(ChatMessage message) async {
+    final id = message.id;
+    if (id == null) return;
+    final sent = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) =>
+          AiResponseReportDialog(messageId: id, responseText: message.text),
+    );
+    if (!mounted || sent != true) return;
+    setState(() => _reportedMessageIds.add(id));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Reporte recibido. Gracias por ayudarnos a revisar esta respuesta.',
+        ),
+      ),
+    );
   }
 
   Future<void> _attachFile(bool photos) async {
@@ -417,6 +442,23 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       appBar: AppBar(
         actions: [
+          IconButton(
+            tooltip: 'Privacidad y uso de IA',
+            icon: const Icon(Icons.info_outline_rounded),
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Sobre el asistente'),
+                content: const SingleChildScrollView(child: ServiceLinks()),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cerrar'),
+                  ),
+                ],
+              ),
+            ),
+          ),
           IconButton(
             tooltip: 'Mis archivos',
             icon: const Icon(Icons.folder_open_outlined),
@@ -685,6 +727,18 @@ class _ChatScreenState extends State<ChatScreen> {
                                             blockSpacing: 8,
                                           ),
                                     )),
+                      ),
+                    if (!msg.isUser && msg.id != null && msg.text.isNotEmpty)
+                      TextButton.icon(
+                        onPressed: _reportedMessageIds.contains(msg.id)
+                            ? null
+                            : () => _reportResponse(msg),
+                        icon: const Icon(Icons.flag_outlined, size: 16),
+                        label: Text(
+                          _reportedMessageIds.contains(msg.id)
+                              ? 'Reporte enviado'
+                              : 'Reportar respuesta',
+                        ),
                       ),
                     if (msg.proposal != null &&
                         msg.proposal!.status == ProposalStatus.pending)

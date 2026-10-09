@@ -49,6 +49,18 @@ class Registry:
                     action TEXT NOT NULL, state TEXT NOT NULL, error TEXT,
                     created_at REAL NOT NULL, updated_at REAL NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS review_credentials (
+                    id TEXT PRIMARY KEY, code_hash TEXT UNIQUE NOT NULL,
+                    space_id TEXT NOT NULL REFERENCES spaces(id),
+                    created_at REAL NOT NULL, revoked_at REAL
+                );
+                CREATE TABLE IF NOT EXISTS review_activations (
+                    credential_id TEXT NOT NULL REFERENCES review_credentials(id),
+                    request_id TEXT NOT NULL, fingerprint TEXT NOT NULL,
+                    operation_id TEXT UNIQUE NOT NULL, result TEXT,
+                    created_at REAL NOT NULL, completed_at REAL,
+                    PRIMARY KEY (credential_id, request_id)
+                );
             """)
         Path(path).chmod(0o600)
 
@@ -170,6 +182,66 @@ class Registry:
     def finish_invitation(self, code_hash: str, result: dict):
         with self.connect() as db:
             db.execute("UPDATE invitations SET result=?,completed_at=? WHERE code_hash=?", (self.seal(result), time.time(), code_hash))
+
+    def _review_target(self, db, space_id: str, allowed_space_id: str):
+        if not allowed_space_id or space_id != allowed_space_id:
+            raise RegistryError(400, "Código inválido o vencido")
+        row = db.execute("SELECT * FROM spaces WHERE id=?", (space_id,)).fetchone()
+        if not row or row["legacy"]:
+            raise RegistryError(400, "Código inválido o vencido")
+        if row["state"] != "ready":
+            raise RegistryError(423, "Espacio suspendido, cerrado o en preparación")
+        if not row["backend_url"] or not row["user_id"] or not row["enrollment_key"]:
+            raise RegistryError(503, "Espacio no disponible")
+
+    def create_review_credential(self, space_id: str, allowed_space_id: str):
+        """Operator-only reusable credential for one explicitly allowlisted demo space."""
+        credential_id, code, now = str(uuid.uuid4()), "review_" + secrets.token_urlsafe(24), time.time()
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._review_target(db, space_id, allowed_space_id)
+            db.execute("UPDATE review_credentials SET revoked_at=? WHERE space_id=? AND revoked_at IS NULL", (now, space_id))
+            db.execute("INSERT INTO review_credentials(id,code_hash,space_id,created_at) VALUES(?,?,?,?)", (credential_id, digest(code), space_id, now))
+        return {"credential_id": credential_id, "code": code, "space_id": space_id, "expires_at": None}
+
+    def revoke_review_credential(self, credential_id: str):
+        with self.connect() as db:
+            changed = db.execute("UPDATE review_credentials SET revoked_at=COALESCE(revoked_at,?) WHERE id=?", (time.time(), credential_id)).rowcount
+            if not changed:
+                raise RegistryError(404, "Credencial de revisión no encontrada")
+        return {"credential_id": credential_id, "revoked": True}
+
+    def reserve_review_activation(self, code: str, request_id: str, fingerprint: str, allowed_space_id: str):
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            credential = db.execute("SELECT * FROM review_credentials WHERE code_hash=?", (digest(code),)).fetchone()
+            if not credential:
+                return None
+            if credential["revoked_at"] is not None:
+                raise RegistryError(400, "Código inválido o vencido")
+            self._review_target(db, credential["space_id"], allowed_space_id)
+            activation = db.execute("SELECT * FROM review_activations WHERE credential_id=? AND request_id=?", (credential["id"], request_id)).fetchone()
+            if activation:
+                activation = dict(activation)
+                if activation["fingerprint"] != fingerprint:
+                    raise RegistryError(409, "La solicitud ya está vinculada a otro dispositivo")
+            else:
+                activation = {"credential_id": credential["id"], "request_id": request_id, "fingerprint": fingerprint,
+                              "operation_id": str(uuid.uuid4()), "result": None}
+                db.execute("INSERT INTO review_activations(credential_id,request_id,fingerprint,operation_id,created_at) VALUES(?,?,?,?,?)", (credential["id"], request_id, fingerprint, activation["operation_id"], time.time()))
+            activation.update(space_id=credential["space_id"], replace_device_id=None)
+            if activation["result"]:
+                activation["result"] = self.open(activation["result"])
+            return activation
+
+    def finish_review_activation(self, credential_id: str, request_id: str, result: dict, allowed_space_id: str):
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            credential = db.execute("SELECT * FROM review_credentials WHERE id=?", (credential_id,)).fetchone()
+            if not credential or credential["revoked_at"] is not None:
+                raise RegistryError(400, "Código inválido o vencido")
+            self._review_target(db, credential["space_id"], allowed_space_id)
+            db.execute("UPDATE review_activations SET result=?,completed_at=? WHERE credential_id=? AND request_id=?", (self.seal(result), time.time(), credential_id, request_id))
 
     def create_session(self, kind: str, value: dict, ttl: int, space_id: str | None = None):
         token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)

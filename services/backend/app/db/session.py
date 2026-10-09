@@ -6,7 +6,7 @@ from app.config import settings
 from app.models.canonical import Base
 
 # Detect engine options based on dialect
-engine_kwargs = {"echo": False}
+engine_kwargs = {"echo": False, "hide_parameters": True}
 if "sqlite" in settings.database_url:
     from sqlalchemy.pool import StaticPool
     if ":memory:" in settings.database_url:

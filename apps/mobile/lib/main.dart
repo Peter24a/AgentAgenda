@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -13,6 +14,14 @@ import 'features/activation/activation_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  LicenseRegistry.addLicense(() async* {
+    for (final family in ['Inter', 'Manrope']) {
+      final license = await rootBundle.loadString(
+        'assets/fonts/$family-OFL.txt',
+      );
+      yield LicenseEntryWithLineBreaks([family], license);
+    }
+  });
   await initializeDateFormatting('es', null);
   await ApiClient.instance.init();
   await FollowUpService.instance.init();

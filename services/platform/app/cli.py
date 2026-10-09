@@ -43,6 +43,11 @@ def main():
     invite.add_argument("--purpose", choices=["enroll", "reconnect"], default="reconnect")
     invite.add_argument("--replace-device-id")
     invite.add_argument("--ttl-seconds", type=int)
+    review = commands.add_parser("create-review-code")
+    review.add_argument("space_id")
+    review.add_argument("--output", required=True, help="Export the reusable review credential into a new private JSON file")
+    revoke_review = commands.add_parser("revoke-review-code")
+    revoke_review.add_argument("credential_id")
     args = parser.parse_args()
     if args.command == "init-key":
         write_private(args.output, Fernet.generate_key())
@@ -79,6 +84,18 @@ def main():
             raise SystemExit("Device replacement requires reconnect purpose")
         result = registry.create_invitation(args.space_id, args.purpose, ttl, args.replace_device_id)
         print(json.dumps(result))
+    elif args.command == "create-review-code":
+        if Path(args.output).exists():
+            raise SystemExit("Output already exists; choose a new private file")
+        result = registry.create_review_credential(args.space_id, cfg.review_space_id)
+        try:
+            write_private(args.output, json.dumps(result).encode())
+        except Exception:
+            registry.revoke_review_credential(result["credential_id"])
+            raise
+        print(json.dumps({"credential_id": result["credential_id"], "space_id": result["space_id"], "code_file": str(Path(args.output).resolve())}))
+    elif args.command == "revoke-review-code":
+        print(json.dumps(registry.revoke_review_credential(args.credential_id)))
 
 
 if __name__ == "__main__":

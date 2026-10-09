@@ -1,3 +1,5 @@
+import '../../../core/time/canonical_timestamp.dart';
+
 /// Modelo de una tarea sincronizable con el backend de AgentAgenda.
 class AgendaTask {
   final String id;
@@ -28,21 +30,21 @@ class AgendaTask {
       status: json['status'] as String? ?? 'pending',
       priority: json['priority'] as String? ?? 'medium',
       dueDate: json['due_date'] != null
-          ? DateTime.parse(json['due_date'] as String)
+          ? parseCanonicalTimestamp(json['due_date'] as String)
           : null,
       version: json['version'] as int? ?? 1,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'description': description,
-        'status': status,
-        'priority': priority,
-        'due_date': dueDate?.toIso8601String(),
-        'version': version,
-      };
+    'id': id,
+    'title': title,
+    'description': description,
+    'status': status,
+    'priority': priority,
+    'due_date': dueDate?.toUtc().toIso8601String(),
+    'version': version,
+  };
 
   AgendaTask copyWith({
     String? id,

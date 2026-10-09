@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from app.models.proposal import AgentProposalModel
 
 
@@ -49,6 +49,7 @@ class ChatTurnResponse(BaseModel):
     status: Literal["queued", "running", "completed", "failed", "cancelled"]
     user_message: str
     assistant_message: Optional[str] = None
+    assistant_message_id: Optional[str] = None
     proposal: Optional[AgentProposalModel] = None
     error_message: Optional[str] = None
     created_at: datetime
@@ -68,3 +69,21 @@ class CheckInRequest(BaseModel):
     event_id: Optional[str] = Field(None, max_length=64)
     scheduled_at: Optional[datetime] = None
     kind: Literal["check_in", "reminder"] = "check_in"
+
+
+ChatReportReason = Literal["harmful", "privacy", "inaccurate", "other"]
+
+
+class ChatReportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    message_id: str = Field(min_length=1, max_length=64)
+    reason: ChatReportReason
+    details: Optional[str] = Field(default=None, max_length=2000)
+
+
+class ChatReportResponse(BaseModel):
+    id: str
+    message_id: str
+    reason: ChatReportReason
+    status: Literal["received", "reviewed", "resolved", "dismissed"]
+    created_at: datetime

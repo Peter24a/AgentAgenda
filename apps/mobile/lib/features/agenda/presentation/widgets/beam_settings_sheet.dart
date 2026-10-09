@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/space_session.dart' as session;
+import '../../../../core/service_links.dart';
 import '../../../../core/theme/beam_color_notifier.dart';
 import '../../../../core/theme/color_schemes.dart';
 
@@ -335,6 +336,18 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
             },
             icon: const Icon(Icons.logout_rounded),
             label: const Text('Desconectar o cambiar de espacio'),
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const ServiceLinks(),
+          TextButton.icon(
+            onPressed: () => showLicensePage(
+              context: context,
+              applicationName: 'AgentAgenda',
+              applicationVersion: '2.0.1',
+            ),
+            icon: const Icon(Icons.description_outlined, size: 18),
+            label: const Text('Licencias de código abierto'),
           ),
 
           if (_connectionStatus != null) ...[

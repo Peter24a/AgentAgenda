@@ -36,3 +36,8 @@ storage/
 *.jks
 *.keystore
 apps/mobile/android/key.properties
+
+# Generated Android distribution artifacts
+*.apk
+*.aab
+*.apks

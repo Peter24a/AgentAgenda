@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, Any
 from sqlalchemy import (
-    Column, String, Integer, Boolean, DateTime, Text, JSON, ForeignKey, Index
+    Column, String, Integer, Boolean, DateTime, Text, JSON, ForeignKey, Index, UniqueConstraint
 )
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -124,6 +124,23 @@ class ChatMessage(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     turn = relationship("ChatTurn", back_populates="messages")
+
+
+class ChatResponseReport(Base):
+    """Owner-submitted feedback; the assistant text stays in its original message."""
+    __tablename__ = "chat_response_reports"
+    id = Column(String(64), primary_key=True)
+    user_id = Column(String(64), nullable=False, index=True)
+    device_id = Column(String(64), nullable=False)
+    message_id = Column(String(64), ForeignKey("chat_messages.id", ondelete="CASCADE"), nullable=False, index=True)
+    reason = Column(String(32), nullable=False)
+    details = Column(Text, nullable=True)
+    status = Column(String(32), nullable=False, default="received", index=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    __table_args__ = (
+        UniqueConstraint("user_id", "device_id", "message_id", name="one_report_per_device_message"),
+    )
 
 class Document(Base):
     __tablename__ = "documents"

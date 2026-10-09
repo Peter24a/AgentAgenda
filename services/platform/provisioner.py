@@ -92,6 +92,8 @@ def provision():
                 "depends_on":{"db":{"condition":"service_healthy"}},"environment":environment,
                 "command":["python","-m","app.worker.runner"],"volumes":[str(data/"vault")+":/storage"],"networks":["default","llm-apps"]}},
             "networks":{"default":{},"llm-apps":{"external":True}}}
+        for service in compose["services"].values():
+            service["logging"] = {"driver": "json-file", "options": {"max-size": "10m", "max-file": "3"}}
         compose_file = root / "compose.json"
         write_private_json(compose_file, compose)
         resources = {"compose":str(compose_file), "project":prefix,"db":prefix+"-db","backend":prefix+"-backend","worker":prefix+"-worker", "enrollment_key":enrollment, "host_port":host_port}

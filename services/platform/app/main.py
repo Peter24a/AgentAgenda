@@ -11,7 +11,7 @@ from typing import Literal
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.background import BackgroundTask
@@ -295,6 +295,7 @@ def create_app(settings: Settings | None = None, registry: Registry | None = Non
         metadata = reg.get_space(space_id)
         metadata["health"] = metadata["state"]
         metadata["usage_bytes"] = None
+        metadata["pending_ai_reports"] = None
         if metadata["state"] == "ready":
             space = reg.get_space(space_id, include_secret=True)
             try:
@@ -305,6 +306,9 @@ def create_app(settings: Settings | None = None, registry: Registry | None = Non
                 metadata["health"] = "ready" if metrics.get("health") == "ready" else "unavailable"
                 effective_quota = metrics.get("quota_bytes")
                 metadata["effective_quota_bytes"] = effective_quota if isinstance(effective_quota, int) and effective_quota > 0 else None
+                pending_reports = metrics.get("pending_ai_reports")
+                if isinstance(pending_reports, int) and not isinstance(pending_reports, bool) and pending_reports >= 0:
+                    metadata["pending_ai_reports"] = pending_reports
             except HTTPException:
                 metadata["health"] = "unavailable"
         return metadata
@@ -351,23 +355,34 @@ def create_app(settings: Settings | None = None, registry: Registry | None = Non
             raise HTTPException(429, "Demasiados intentos; espera unos minutos", headers={"Retry-After": "300"})
         nonce = body.request_id or str(uuid.uuid4())
         fingerprint = digest(json.dumps({"device_name": body.device_name, "platform": body.platform, "client_device_id": body.client_device_id}, sort_keys=True))
-        invite = reg.reserve_invitation(body.code.strip(), nonce, fingerprint)
+        invite = reg.reserve_review_activation(body.code.strip(), nonce, fingerprint, cfg.review_space_id)
+        is_review = invite is not None
+        if not is_review:
+            invite = reg.reserve_invitation(body.code.strip(), nonce, fingerprint)
         space = available(invite["space_id"])
         operation_id = invite["operation_id"]
         lock = activation_locks.setdefault(operation_id, asyncio.Lock())
         async with lock:
             # Re-read the receipt after locking so simultaneous retries never enroll twice.
-            invite = reg.reserve_invitation(body.code.strip(), nonce, fingerprint)
+            invite = (reg.reserve_review_activation(body.code.strip(), nonce, fingerprint, cfg.review_space_id)
+                      if is_review else reg.reserve_invitation(body.code.strip(), nonce, fingerprint))
             result = invite["result"]
             if not result:
-                result = await backend_json(space, "POST", "/internal/enroll", headers={"X-Enrollment-Key": space["enrollment_key"]}, json_body={"operation_id": operation_id, "user_id": space["user_id"], "device_name": body.device_name, "platform": body.platform, "client_device_id": body.client_device_id, "replace_device_id": invite["replace_device_id"]})
+                result = await backend_json(space, "POST", "/internal/enroll", headers={"X-Enrollment-Key": space["enrollment_key"]}, json_body={"operation_id": operation_id, "user_id": space["user_id"], "device_name": body.device_name, "platform": body.platform, "client_device_id": None if is_review else body.client_device_id, "replace_device_id": invite["replace_device_id"]})
                 if not isinstance(result, dict) or not all(k in result for k in ("device_id", "access_token", "refresh_token", "expires_in", "scopes")):
                     raise HTTPException(502, "Respuesta de activación inválida")
                 identity = await validate_identity(space, result["access_token"])
                 if identity["device_id"] != result["device_id"]:
                     raise HTTPException(502, "Identidad de activación inválida")
                 result["access_expires_at"] = time.time() + result["expires_in"]
-                reg.finish_invitation(invite["code_hash"], result)
+                if is_review:
+                    reg.finish_review_activation(invite["credential_id"], nonce, result, cfg.review_space_id)
+                else:
+                    reg.finish_invitation(invite["code_hash"], result)
+        available(space["id"])
+        if is_review:
+            # Revocation/state changes while upstream enrollment awaited must block the response too.
+            reg.reserve_review_activation(body.code.strip(), nonce, fingerprint, cfg.review_space_id)
         metadata = {"space_id": space["id"], "space_name": space["name"], "base_url": origin + "/s/" + space["id"]}
         if body.platform == "web":
             # Passwords/tokens never enter browser localStorage or administrative responses.
@@ -486,6 +501,18 @@ def create_app(settings: Settings | None = None, registry: Registry | None = Non
         return FileResponse(path, filename="AgentAgenda.apk", media_type="application/vnd.android.package-archive")
 
     web_root = Path(cfg.web_root)
+
+    @app.get("/privacidad")
+    async def privacy_policy():
+        return RedirectResponse("https://privacy.ici-labs.com/agentagenda/", status_code=302)
+
+    @app.get("/soporte")
+    async def public_support():
+        path = web_root / "support.html"
+        if not path.is_file():
+            raise HTTPException(503, "La página de soporte todavía no está disponible")
+        return FileResponse(path, media_type="text/html")
+
     if (web_root / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=web_root / "assets"), name="assets")
 

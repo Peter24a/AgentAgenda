@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import 'color_schemes.dart';
 
 /// Tema Material 3 adaptado a la Identidad Visual Unificada SARA (v0.4.0).
@@ -25,6 +26,8 @@ class AppTheme {
   }
 
   static ThemeData _buildTheme(ColorScheme colorScheme) {
+    // Use the bundled variants on every installation, including offline startup.
+    GoogleFonts.config.allowRuntimeFetching = false;
     // Tipografía base: Inter
     final baseTextTheme = GoogleFonts.interTextTheme(
       ThemeData(brightness: colorScheme.brightness).textTheme,
@@ -89,20 +92,14 @@ class AppTheme {
         color: colorScheme.surfaceContainerLow,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusCard),
-          side: BorderSide(
-            color: colorScheme.outlineVariant,
-            width: 1.0,
-          ),
+          side: BorderSide(color: colorScheme.outlineVariant, width: 1.0),
         ),
         clipBehavior: Clip.antiAlias,
       ),
       chipTheme: ChipThemeData(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusControl),
-          side: BorderSide(
-            color: colorScheme.outlineVariant,
-            width: 1.0,
-          ),
+          side: BorderSide(color: colorScheme.outlineVariant, width: 1.0),
         ),
         backgroundColor: colorScheme.surfaceContainer,
         selectedColor: colorScheme.primaryContainer,
@@ -143,10 +140,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radiusControl),
           ),
-          side: BorderSide(
-            color: colorScheme.outline,
-            width: 1.0,
-          ),
+          side: BorderSide(color: colorScheme.outline, width: 1.0),
           foregroundColor: colorScheme.onSurface,
           textStyle: GoogleFonts.inter(
             fontWeight: FontWeight.w500,
@@ -211,7 +205,9 @@ class AppTheme {
         backgroundColor: colorScheme.surfaceContainerLow,
         modalBackgroundColor: colorScheme.surfaceContainerLow,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(radiusDialog)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(radiusDialog),
+          ),
         ),
         clipBehavior: Clip.antiAlias,
       ),
