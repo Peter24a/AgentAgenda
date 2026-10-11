@@ -117,7 +117,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
                       ),
                     ),
                     ExpansionTile(
-                      title: const Text('Dirección del servicio'),
+                      title: const Text('Configuración avanzada'),
                       tilePadding: EdgeInsets.zero,
                       children: [
                         TextFormField(
@@ -127,7 +127,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
                           autocorrect: false,
                           enableSuggestions: false,
                           decoration: const InputDecoration(
-                            labelText: 'Servidor HTTPS',
+                            labelText: 'Dirección del servicio',
                             border: OutlineInputBorder(),
                           ),
                         ),

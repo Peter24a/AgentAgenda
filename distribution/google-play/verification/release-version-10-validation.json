@@ -1,0 +1,491 @@
+{
+  "verified_at": "2026-10-10T06:09:14.209528+00:00",
+  "passed": true,
+  "checks": {
+    "zip_unique_names_and_no_symlinks": true,
+    "previous_zip_unique_names_and_no_symlinks": true,
+    "elf_64_bit_load_segments_aligned_16kb": true,
+    "non_app_native_libraries_unchanged": true,
+    "jarsigner_verified": true,
+    "jarfile_all_payloads_signed_by_expected_certificate": true,
+    "bundletool_validate": true,
+    "manifest_package": true,
+    "manifest_version_name": true,
+    "manifest_version_code": true,
+    "bundle_native_alignment_16kb": true
+  },
+  "errors": [],
+  "scope": {
+    "built": false,
+    "installed": false,
+    "published": false,
+    "apk_splits_generated": false,
+    "runtime_tested_for_this_bundle": false,
+    "limitations": [
+      "ELF and bundle alignment checks are static checks, not a 16 KB runtime test.",
+      "Byte-identical non-app libraries preserve comparison evidence only; previous runtime results do not verify this version.",
+      "This validation does not establish Google Play acceptance or review status."
+    ]
+  },
+  "artifact": {
+    "path": "/home/peterpad/Documents/AgentAgenda/apps/mobile/build/app/outputs/bundle/release/app-release.aab",
+    "bytes": 61460825,
+    "sha256": "bd629f9ff4ad06ad421b5a846aab338c85d2abd7f2347ff735bf9d10709c95c7"
+  },
+  "previous_artifact": {
+    "path": "/home/peterpad/Documents/AgentAgenda/distribution/google-play/release/AgentAgenda-2.0.2+9.aab",
+    "bytes": 61439778,
+    "sha256": "8037f08e4a2b1b9e93ce3c7c54a57af2b2f2d6643a79b4b9cd27be22d3ae631f"
+  },
+  "zip": {
+    "entries": 363,
+    "duplicate_names": [],
+    "symlinks": []
+  },
+  "previous_zip": {
+    "entries": 363,
+    "duplicate_names": [],
+    "symlinks": []
+  },
+  "native_libraries": [
+    {
+      "library": "base/lib/arm64-v8a/libapp.so",
+      "sha256": "d18dadb6eb0dfb757cca87d239017c60ec92b42f3d60dbd43f9959f866fbb2aa",
+      "elf_bits": 64,
+      "load_segments": [
+        {
+          "offset": 0,
+          "virtual_address": 0,
+          "alignment": 65536,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 3145728,
+          "virtual_address": 3145728,
+          "alignment": 65536,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 7733248,
+          "virtual_address": 7733248,
+          "alignment": 65536,
+          "aligned_16kb": true
+        }
+      ],
+      "passed_16kb": true
+    },
+    {
+      "library": "base/lib/arm64-v8a/libdartjni.so",
+      "sha256": "6dedc452b5ed9445a746aabf3784665d5f789cfdf647073f4f2312f2539e0c77",
+      "elf_bits": 64,
+      "load_segments": [
+        {
+          "offset": 0,
+          "virtual_address": 0,
+          "alignment": 16384,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 125968,
+          "virtual_address": 142352,
+          "alignment": 16384,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 127344,
+          "virtual_address": 160112,
+          "alignment": 16384,
+          "aligned_16kb": true
+        }
+      ],
+      "passed_16kb": true
+    },
+    {
+      "library": "base/lib/arm64-v8a/libdatastore_shared_counter.so",
+      "sha256": "d3e48717c9aa147e0ab21063ba0e8e0211cabf8bf40b222640829519edbf58e1",
+      "elf_bits": 64,
+      "load_segments": [
+        {
+          "offset": 0,
+          "virtual_address": 0,
+          "alignment": 16384,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 4544,
+          "virtual_address": 20928,
+          "alignment": 16384,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 5160,
+          "virtual_address": 37928,
+          "alignment": 16384,
+          "aligned_16kb": true
+        }
+      ],
+      "passed_16kb": true
+    },
+    {
+      "library": "base/lib/arm64-v8a/libflutter.so",
+      "sha256": "d70bbedc2b157630f90123a32ca894a6fa1816ec10cda9f335bada0692b376ee",
+      "elf_bits": 64,
+      "load_segments": [
+        {
+          "offset": 0,
+          "virtual_address": 0,
+          "alignment": 65536,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 11370224,
+          "virtual_address": 11435760,
+          "alignment": 65536,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 11739624,
+          "virtual_address": 11870696,
+          "alignment": 65536,
+          "aligned_16kb": true
+        }
+      ],
+      "passed_16kb": true
+    },
+    {
+      "library": "base/lib/armeabi-v7a/libapp.so",
+      "sha256": "cdd91eefc59134c14ad9e4e68ea5c166220ca23d1ed6dc2da3600e942373e4fe",
+      "elf_bits": 32,
+      "load_segments": [
+        {
+          "offset": 0,
+          "virtual_address": 0,
+          "alignment": 16384,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 3702784,
+          "virtual_address": 3702784,
+          "alignment": 16384,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 8585216,
+          "virtual_address": 8585216,
+          "alignment": 16384,
+          "aligned_16kb": true
+        }
+      ],
+      "passed_16kb": null
+    },
+    {
+      "library": "base/lib/armeabi-v7a/libdartjni.so",
+      "sha256": "c2a4fd407978ea045674f5e5135e3b4d1f64a6502a5f8894056bf19351910a04",
+      "elf_bits": 32,
+      "load_segments": [
+        {
+          "offset": 0,
+          "virtual_address": 0,
+          "alignment": 16384,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 78256,
+          "virtual_address": 94640,
+          "alignment": 16384,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 78948,
+          "virtual_address": 111716,
+          "alignment": 16384,
+          "aligned_16kb": true
+        }
+      ],
+      "passed_16kb": null
+    },
+    {
+      "library": "base/lib/armeabi-v7a/libdatastore_shared_counter.so",
+      "sha256": "716c5d8d2cac8ca0edf65da8f139c7886b726ac79d542a14edeb94994ba6d3dc",
+      "elf_bits": 32,
+      "load_segments": [
+        {
+          "offset": 0,
+          "virtual_address": 0,
+          "alignment": 16384,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 2704,
+          "virtual_address": 19088,
+          "alignment": 16384,
+          "aligned_16kb": true
+        }
+      ],
+      "passed_16kb": null
+    },
+    {
+      "library": "base/lib/armeabi-v7a/libflutter.so",
+      "sha256": "f0d234bc9bee0cf4f52ebe2f162364baefbb2fe4539bd819515a44f7984be384",
+      "elf_bits": 32,
+      "load_segments": [
+        {
+          "offset": 0,
+          "virtual_address": 0,
+          "alignment": 65536,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 8416864,
+          "virtual_address": 8482400,
+          "alignment": 65536,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 8611352,
+          "virtual_address": 8742424,
+          "alignment": 65536,
+          "aligned_16kb": true
+        }
+      ],
+      "passed_16kb": null
+    },
+    {
+      "library": "base/lib/x86_64/libapp.so",
+      "sha256": "6109694d1a95d262c8edbb7630566cbd53d2063f8b058ccc9e58e0a8e0ebfdf4",
+      "elf_bits": 64,
+      "load_segments": [
+        {
+          "offset": 0,
+          "virtual_address": 0,
+          "alignment": 65536,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 3080192,
+          "virtual_address": 3080192,
+          "alignment": 65536,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 7864320,
+          "virtual_address": 7864320,
+          "alignment": 65536,
+          "aligned_16kb": true
+        }
+      ],
+      "passed_16kb": true
+    },
+    {
+      "library": "base/lib/x86_64/libdartjni.so",
+      "sha256": "c01d3e2e81a1690063b9589eac210d5e148bd42960026410c44479ca96a98b75",
+      "elf_bits": 64,
+      "load_segments": [
+        {
+          "offset": 0,
+          "virtual_address": 0,
+          "alignment": 16384,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 111360,
+          "virtual_address": 127744,
+          "alignment": 16384,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 112736,
+          "virtual_address": 145504,
+          "alignment": 16384,
+          "aligned_16kb": true
+        }
+      ],
+      "passed_16kb": true
+    },
+    {
+      "library": "base/lib/x86_64/libdatastore_shared_counter.so",
+      "sha256": "fb6c9208988c49ae94943bc3236fa763ba584722e044fa4ea9a12d2941027105",
+      "elf_bits": 64,
+      "load_segments": [
+        {
+          "offset": 0,
+          "virtual_address": 0,
+          "alignment": 16384,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 3872,
+          "virtual_address": 20256,
+          "alignment": 16384,
+          "aligned_16kb": true
+        }
+      ],
+      "passed_16kb": true
+    },
+    {
+      "library": "base/lib/x86_64/libflutter.so",
+      "sha256": "bf332effcc407a658cb477b94417f83ce8df11b1676a06ee42ff754817b4197a",
+      "elf_bits": 64,
+      "load_segments": [
+        {
+          "offset": 0,
+          "virtual_address": 0,
+          "alignment": 65536,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 12676720,
+          "virtual_address": 12742256,
+          "alignment": 65536,
+          "aligned_16kb": true
+        },
+        {
+          "offset": 13038784,
+          "virtual_address": 13169856,
+          "alignment": 65536,
+          "aligned_16kb": true
+        }
+      ],
+      "passed_16kb": true
+    }
+  ],
+  "non_app_native_comparison": {
+    "added": [],
+    "removed": [],
+    "changed": [],
+    "unchanged": [
+      "base/lib/arm64-v8a/libdartjni.so",
+      "base/lib/arm64-v8a/libdatastore_shared_counter.so",
+      "base/lib/arm64-v8a/libflutter.so",
+      "base/lib/armeabi-v7a/libdartjni.so",
+      "base/lib/armeabi-v7a/libdatastore_shared_counter.so",
+      "base/lib/armeabi-v7a/libflutter.so",
+      "base/lib/x86_64/libdartjni.so",
+      "base/lib/x86_64/libdatastore_shared_counter.so",
+      "base/lib/x86_64/libflutter.so"
+    ],
+    "current_sha256": {
+      "base/lib/arm64-v8a/libdartjni.so": "6dedc452b5ed9445a746aabf3784665d5f789cfdf647073f4f2312f2539e0c77",
+      "base/lib/arm64-v8a/libdatastore_shared_counter.so": "d3e48717c9aa147e0ab21063ba0e8e0211cabf8bf40b222640829519edbf58e1",
+      "base/lib/arm64-v8a/libflutter.so": "d70bbedc2b157630f90123a32ca894a6fa1816ec10cda9f335bada0692b376ee",
+      "base/lib/armeabi-v7a/libdartjni.so": "c2a4fd407978ea045674f5e5135e3b4d1f64a6502a5f8894056bf19351910a04",
+      "base/lib/armeabi-v7a/libdatastore_shared_counter.so": "716c5d8d2cac8ca0edf65da8f139c7886b726ac79d542a14edeb94994ba6d3dc",
+      "base/lib/armeabi-v7a/libflutter.so": "f0d234bc9bee0cf4f52ebe2f162364baefbb2fe4539bd819515a44f7984be384",
+      "base/lib/x86_64/libdartjni.so": "c01d3e2e81a1690063b9589eac210d5e148bd42960026410c44479ca96a98b75",
+      "base/lib/x86_64/libdatastore_shared_counter.so": "fb6c9208988c49ae94943bc3236fa763ba584722e044fa4ea9a12d2941027105",
+      "base/lib/x86_64/libflutter.so": "bf332effcc407a658cb477b94417f83ce8df11b1676a06ee42ff754817b4197a"
+    },
+    "previous_sha256": {
+      "base/lib/arm64-v8a/libdartjni.so": "6dedc452b5ed9445a746aabf3784665d5f789cfdf647073f4f2312f2539e0c77",
+      "base/lib/arm64-v8a/libdatastore_shared_counter.so": "d3e48717c9aa147e0ab21063ba0e8e0211cabf8bf40b222640829519edbf58e1",
+      "base/lib/arm64-v8a/libflutter.so": "d70bbedc2b157630f90123a32ca894a6fa1816ec10cda9f335bada0692b376ee",
+      "base/lib/armeabi-v7a/libdartjni.so": "c2a4fd407978ea045674f5e5135e3b4d1f64a6502a5f8894056bf19351910a04",
+      "base/lib/armeabi-v7a/libdatastore_shared_counter.so": "716c5d8d2cac8ca0edf65da8f139c7886b726ac79d542a14edeb94994ba6d3dc",
+      "base/lib/armeabi-v7a/libflutter.so": "f0d234bc9bee0cf4f52ebe2f162364baefbb2fe4539bd819515a44f7984be384",
+      "base/lib/x86_64/libdartjni.so": "c01d3e2e81a1690063b9589eac210d5e148bd42960026410c44479ca96a98b75",
+      "base/lib/x86_64/libdatastore_shared_counter.so": "fb6c9208988c49ae94943bc3236fa763ba584722e044fa4ea9a12d2941027105",
+      "base/lib/x86_64/libflutter.so": "bf332effcc407a658cb477b94417f83ce8df11b1676a06ee42ff754817b4197a"
+    },
+    "previous_runtime_results_reused_as_current": false
+  },
+  "jarsigner": {
+    "exit_code": 0,
+    "diagnostics": "jar verified.\n\nWarning: \nThis jar contains entries whose certificate chain is invalid. Reason: Cannot invoke \"java.security.cert.PKIXBuilderParameters.getTrustAnchors()\" because \"params\" is null\nThis jar contains entries whose signer certificate is self-signed.\nThis jar contains signatures that do not include a timestamp. Without a timestamp, users may not be able to validate this jar after any of the signer certificates expire (as early as 2054-02-23).\nPOSIX file permission and/or symlink attributes detected. These attributes are ignored when signing and are not protected by the signature.\n\nThis JAR file contains internal inconsistencies that may result in different contents when reading via JarFile and JarInputStream:\n- Manifest is missing when reading via JarInputStream\n\nRe-run with the -verbose and -certs options for more details.",
+    "entry_order_warning_lines_omitted": 361
+  },
+  "jarfile": {
+    "payloads": 360,
+    "signed_payloads": 360,
+    "unsigned_payloads": 0,
+    "certificate_sha256": [
+      "35e555ba23217ca7b9565e94b732e3974e6f77e15e9f32496d18d3a507dab69f"
+    ],
+    "certificate_valid_until": [
+      "2054-02-24T01:25:48Z"
+    ],
+    "expected_certificate_sha256": "35e555ba23217ca7b9565e94b732e3974e6f77e15e9f32496d18d3a507dab69f"
+  },
+  "bundletool": {
+    "path": "/home/peterpad/.local/share/agentagenda/tools/bundletool-all-1.18.3.jar",
+    "sha256": "a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29",
+    "validate": {
+      "exit_code": 0,
+      "diagnostics": "App Bundle information\n------------\nFeature modules:\n\tFeature module: base\n\t\tFile: assets/flutter_assets/AssetManifest.bin\n\t\tFile: assets/flutter_assets/FontManifest.json\n\t\tFile: assets/flutter_assets/NOTICES.Z\n\t\tFile: assets/flutter_assets/NativeAssetsManifest.json\n\t\tFile: assets/flutter_assets/assets/fonts/Inter-Black.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Inter-BlackItalic.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Inter-Bold.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Inter-BoldItalic.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Inter-ExtraBold.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Inter-ExtraBoldItalic.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Inter-ExtraLight.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Inter-ExtraLightItalic.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Inter-Italic.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Inter-Light.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Inter-LightItalic.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Inter-Medium.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Inter-MediumItalic.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Inter-OFL.txt\n\t\tFile: assets/flutter_assets/assets/fonts/Inter-Regular.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Inter-SemiBold.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Inter-SemiBoldItalic.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Inter-Thin.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Inter-ThinItalic.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Manrope-Bold.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Manrope-ExtraBold.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Manrope-ExtraLight.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Manrope-Light.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Manrope-Medium.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Manrope-OFL.txt\n\t\tFile: assets/flutter_assets/assets/fonts/Manrope-Regular.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/Manrope-SemiBold.ttf\n\t\tFile: assets/flutter_assets/assets/fonts/README.md\n\t\tFile: assets/flutter_assets/fonts/MaterialIcons-Regular.otf\n\t\tFile: assets/flutter_assets/packages/cupertino_icons/assets/CupertinoIcons.ttf\n\t\tFile: assets/flutter_assets/packages/flutter_local_notifications_web/web/notifications_service_worker.js\n\t\tFile: assets/flutter_assets/shaders/ink_sparkle.frag\n\t\tFile: assets/flutter_assets/shaders/stretch_effect.frag\n\t\tFile: dex/classes.dex\n\t\tFile: dex/classes2.dex\n\t\tFile: lib/arm64-v8a/libapp.so\n\t\tFile: lib/arm64-v8a/libdartjni.so\n\t\tFile: lib/arm64-v8a/libdatastore_shared_counter.so\n\t\tFile: lib/arm64-v8a/libflutter.so\n\t\tFile: lib/armeabi-v7a/libapp.so\n\t\tFile: lib/armeabi-v7a/libdartjni.so\n\t\tFile: lib/armeabi-v7a/libdatastore_shared_counter.so\n\t\tFile: lib/armeabi-v7a/libflutter.so\n\t\tFile: lib/x86_64/libapp.so\n\t\tFile: lib/x86_64/libdartjni.so\n\t\tFile: lib/x86_64/libdatastore_shared_counter.so\n\t\tFile: lib/x86_64/libflutter.so\n\t\tFile: res/anim/abc_tooltip_enter.xml\n\t\tFile: res/anim/abc_tooltip_exit.xml\n\t\tFile: res/anim/btn_checkbox_to_checked_box_inner_merged_animation.xml\n\t\tFile: res/anim/btn_checkbox_to_checked_box_outer_merged_animation.xml\n\t\tFile: res/anim/btn_checkbox_to_checked_icon_null_animation.xml\n\t\tFile: res/anim/btn_checkbox_to_unchecked_box_inner_merged_animation.xml\n\t\tFile: res/anim/btn_checkbox_to_unchecked_check_path_merged_animation.xml\n\t\tFile: res/anim/btn_checkbox_to_unchecked_icon_null_animation.xml\n\t\tFile: res/anim/btn_radio_to_off_mtrl_dot_group_animation.xml\n\t\tFile: res/anim/btn_radio_to_off_mtrl_ring_outer_animation.xml\n\t\tFile: res/anim/btn_radio_to_off_mtrl_ring_outer_path_animation.xml\n\t\tFile: res/anim/btn_radio_to_on_mtrl_dot_group_animation.xml\n\t\tFile: res/anim/btn_radio_to_on_mtrl_ring_outer_animation.xml\n\t\tFile: res/anim/btn_radio_to_on_mtrl_ring_outer_path_animation.xml\n\t\tFile: res/color-v23/abc_tint_btn_checkable.xml\n\t\tFile: res/color-v23/abc_tint_default.xml\n\t\tFile: res/color-v23/abc_tint_edittext.xml\n\t\tFile: res/color-v23/abc_tint_seek_thumb.xml\n\t\tFile: res/color-v23/abc_tint_spinner.xml\n\t\tFile: res/color-v23/abc_tint_switch_track.xml\n\t\tFile: res/drawable-hdpi-v4/abc_ab_share_pack_mtrl_alpha.9.png\n\t\tFile: res/drawable-hdpi-v4/abc_btn_check_to_on_mtrl_000.png\n\t\tFile: res/drawable-hdpi-v4/abc_btn_check_to_on_mtrl_015.png\n\t\tFile: res/drawable-hdpi-v4/abc_btn_radio_to_on_mtrl_000.png\n\t\tFile: res/drawable-hdpi-v4/abc_btn_radio_to_on_mtrl_015.png\n\t\tFile: res/drawable-hdpi-v4/abc_btn_switch_to_on_mtrl_00001.9.png\n\t\tFile: res/drawable-hdpi-v4/abc_btn_switch_to_on_mtrl_00012.9.png\n\t\tFile: res/drawable-hdpi-v4/abc_cab_background_top_mtrl_alpha.9.png\n\t\tFile: res/drawable-hdpi-v4/abc_ic_commit_search_api_mtrl_alpha.png\n\t\tFile: res/drawable-hdpi-v4/abc_list_divider_mtrl_alpha.9.png\n\t\tFile: res/drawable-hdpi-v4/abc_menu_hardkey_panel_mtrl_mult.9.png\n\t\tFile: res/drawable-hdpi-v4/abc_popup_background_mtrl_mult.9.png\n\t\tFile: res/drawable-hdpi-v4/abc_scrubber_control_off_mtrl_alpha.png\n\t\tFile: res/drawable-hdpi-v4/abc_scrubber_control_to_pressed_mtrl_000.png\n\t\tFile: res/drawable-hdpi-v4/abc_scrubber_control_to_pressed_mtrl_005.png\n\t\tFile: res/drawable-hdpi-v4/abc_scrubber_primary_mtrl_alpha.9.png\n\t\tFile: res/drawable-hdpi-v4/abc_scrubber_track_mtrl_alpha.9.png\n\t\tFile: res/drawable-hdpi-v4/abc_spinner_mtrl_am_alpha.9.png\n\t\tFile: res/drawable-hdpi-v4/abc_switch_track_mtrl_alpha.9.png\n\t\tFile: res/drawable-hdpi-v4/abc_tab_indicator_mtrl_alpha.9.png\n\t\tFile: res/drawable-hdpi-v4/abc_text_select_handle_left_mtrl.png\n\t\tFile: res/drawable-hdpi-v4/abc_text_select_handle_middle_mtrl.png\n\t\tFile: res/drawable-hdpi-v4/abc_text_select_handle_right_mtrl.png\n\t\tFile: res/drawable-hdpi-v4/abc_textfield_activated_mtrl_alpha.9.png\n\t\tFile: res/drawable-hdpi-v4/abc_textfield_default_mtrl_alpha.9.png\n\t\tFile: res/drawable-hdpi-v4/abc_textfield_search_activated_mtrl_alpha.9.png\n\t\tFile: res/drawable-hdpi-v4/abc_textfield_search_default_mtrl_alpha.9.png\n\t\tFile: res/drawable-ldrtl-hdpi-v17/abc_spinner_mtrl_am_alpha.9.png\n\t\tFile: res/drawable-ldrtl-mdpi-v17/abc_spinner_mtrl_am_alpha.9.png\n\t\tFile: res/drawable-ldrtl-xhdpi-v17/abc_spinner_mtrl_am_alpha.9.png\n\t\tFile: res/drawable-ldrtl-xxhdpi-v17/abc_spinner_mtrl_am_alpha.9.png\n\t\tFile: res/drawable-ldrtl-xxxhdpi-v17/abc_spinner_mtrl_am_alpha.9.png\n\t\tFile: res/drawable-mdpi-v4/abc_ab_share_pack_mtrl_alpha.9.png\n\t\tFile: res/drawable-mdpi-v4/abc_btn_check_to_on_mtrl_000.png\n\t\tFile: res/drawable-mdpi-v4/abc_btn_check_to_on_mtrl_015.png\n\t\tFile: res/drawable-mdpi-v4/abc_btn_radio_to_on_mtrl_000.png\n\t\tFile: res/drawable-mdpi-v4/abc_btn_radio_to_on_mtrl_015.png\n\t\tFile: res/drawable-mdpi-v4/abc_btn_switch_to_on_mtrl_00001.9.png\n\t\tFile: res/drawable-mdpi-v4/abc_btn_switch_to_on_mtrl_00012.9.png\n\t\tFile: res/drawable-mdpi-v4/abc_cab_background_top_mtrl_alpha.9.png\n\t\tFile: res/drawable-mdpi-v4/abc_ic_commit_search_api_mtrl_alpha.png\n\t\tFile: res/drawable-mdpi-v4/abc_list_divider_mtrl_alpha.9.png\n\t\tFile: res/drawable-mdpi-v4/abc_menu_hardkey_panel_mtrl_mult.9.png\n\t\tFile: res/drawable-mdpi-v4/abc_popup_background_mtrl_mult.9.png\n\t\tFile: res/drawable-mdpi-v4/abc_scrubber_control_off_mtrl_alpha.png\n\t\tFile: res/drawable-mdpi-v4/abc_scrubber_control_to_pressed_mtrl_000.png\n\t\tFile: res/drawable-mdpi-v4/abc_scrubber_control_to_pressed_mtrl_005.png\n\t\tFile: res/drawable-mdpi-v4/abc_scrubber_primary_mtrl_alpha.9.png\n\t\tFile: res/drawable-mdpi-v4/abc_scrubber_track_mtrl_alpha.9.png\n\t\tFile: res/drawable-mdpi-v4/abc_spinner_mtrl_am_alpha.9.png\n\t\tFile: res/drawable-mdpi-v4/abc_switch_track_mtrl_alpha.9.png\n\t\tFile: res/drawable-mdpi-v4/abc_tab_indicator_mtrl_alpha.9.png\n\t\tFile: res/drawable-mdpi-v4/abc_text_select_handle_left_mtrl.png\n\t\tFile: res/drawable-mdpi-v4/abc_text_select_handle_middle_mtrl.png\n\t\tFile: res/drawable-mdpi-v4/abc_text_select_handle_right_mtrl.png\n\t\tFile: res/drawable-mdpi-v4/abc_textfield_activated_mtrl_alpha.9.png\n\t\tFile: res/drawable-mdpi-v4/abc_textfield_default_mtrl_alpha.9.png\n\t\tFile: res/drawable-mdpi-v4/abc_textfield_search_activated_mtrl_alpha.9.png\n\t\tFile: res/drawable-mdpi-v4/abc_textfield_search_default_mtrl_alpha.9.png\n\t\tFile: res/drawable-v21/abc_btn_colored_material.xml\n\t\tFile: res/drawable-v21/abc_dialog_material_background.xml\n\t\tFile: res/drawable-v21/abc_edit_text_material.xml\n\t\tFile: res/drawable-v21/launch_background.xml\n\t\tFile: res/drawable-watch-v20/abc_dialog_material_background.xml\n\t\tFile: res/drawable-xhdpi-v4/abc_ab_share_pack_mtrl_alpha.9.png\n\t\tFile: res/drawable-xhdpi-v4/abc_btn_check_to_on_mtrl_000.png\n\t\tFile: res/drawable-xhdpi-v4/abc_btn_check_to_on_mtrl_015.png\n\t\tFile: res/drawable-xhdpi-v4/abc_btn_radio_to_on_mtrl_000.png\n\t\tFile: res/drawable-xhdpi-v4/abc_btn_radio_to_on_mtrl_015.png\n\t\tFile: res/drawable-xhdpi-v4/abc_btn_switch_to_on_mtrl_00001.9.png\n\t\tFile: res/drawable-xhdpi-v4/abc_btn_switch_to_on_mtrl_00012.9.png\n\t\tFile: res/drawable-xhdpi-v4/abc_cab_background_top_mtrl_alpha.9.png\n\t\tFile: res/drawable-xhdpi-v4/abc_ic_commit_search_api_mtrl_alpha.png\n\t\tFile: res/drawable-xhdpi-v4/abc_list_divider_mtrl_alpha.9.png\n\t\tFile: res/drawable-xhdpi-v4/abc_menu_hardkey_panel_mtrl_mult.9.png\n\t\tFile: res/drawable-xhdpi-v4/abc_popup_background_mtrl_mult.9.png\n\t\tFile: res/drawable-xhdpi-v4/abc_scrubber_control_off_mtrl_alpha.png\n\t\tFile: res/drawable-xhdpi-v4/abc_scrubber_control_to_pressed_mtrl_000.png\n\t\tFile: res/drawable-xhdpi-v4/abc_scrubber_control_to_pressed_mtrl_005.png\n\t\tFile: res/drawable-xhdpi-v4/abc_scrubber_primary_mtrl_alpha.9.png\n\t\tFile: res/drawable-xhdpi-v4/abc_scrubber_track_mtrl_alpha.9.png\n\t\tFile: res/drawable-xhdpi-v4/abc_spinner_mtrl_am_alpha.9.png\n\t\tFile: res/drawable-xhdpi-v4/abc_switch_track_mtrl_alpha.9.png\n\t\tFile: res/drawable-xhdpi-v4/abc_tab_indicator_mtrl_alpha.9.png\n\t\tFile: res/drawable-xhdpi-v4/abc_text_select_handle_left_mtrl.png\n\t\tFile: res/drawable-xhdpi-v4/abc_text_select_handle_middle_mtrl.png\n\t\tFile: res/drawable-xhdpi-v4/abc_text_select_handle_right_mtrl.png\n\t\tFile: res/drawable-xhdpi-v4/abc_textfield_activated_mtrl_alpha.9.png\n\t\tFile: res/drawable-xhdpi-v4/abc_textfield_default_mtrl_alpha.9.png\n\t\tFile: res/drawable-xhdpi-v4/abc_textfield_search_activated_mtrl_alpha.9.png\n\t\tFile: res/drawable-xhdpi-v4/abc_textfield_search_default_mtrl_alpha.9.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_ab_share_pack_mtrl_alpha.9.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_btn_check_to_on_mtrl_000.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_btn_check_to_on_mtrl_015.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_btn_radio_to_on_mtrl_000.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_btn_radio_to_on_mtrl_015.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_btn_switch_to_on_mtrl_00001.9.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_btn_switch_to_on_mtrl_00012.9.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_cab_background_top_mtrl_alpha.9.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_ic_commit_search_api_mtrl_alpha.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_list_divider_mtrl_alpha.9.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_menu_hardkey_panel_mtrl_mult.9.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_popup_background_mtrl_mult.9.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_scrubber_control_off_mtrl_alpha.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_scrubber_control_to_pressed_mtrl_000.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_scrubber_control_to_pressed_mtrl_005.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_scrubber_primary_mtrl_alpha.9.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_scrubber_track_mtrl_alpha.9.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_spinner_mtrl_am_alpha.9.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_switch_track_mtrl_alpha.9.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_tab_indicator_mtrl_alpha.9.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_text_select_handle_left_mtrl.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_text_select_handle_middle_mtrl.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_text_select_handle_right_mtrl.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_textfield_activated_mtrl_alpha.9.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_textfield_default_mtrl_alpha.9.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_textfield_search_activated_mtrl_alpha.9.png\n\t\tFile: res/drawable-xxhdpi-v4/abc_textfield_search_default_mtrl_alpha.9.png\n\t\tF",
+      "entry_order_warning_lines_omitted": 0
+    }
+  },
+  "manifest": {
+    "package": "com.agentagenda.agent_agenda",
+    "version_name": "2.0.3",
+    "version_code": "10",
+    "min_sdk": "24",
+    "target_sdk": "36",
+    "permissions": [
+      "android.permission.INTERNET",
+      "android.permission.POST_NOTIFICATIONS",
+      "android.permission.RECEIVE_BOOT_COMPLETED",
+      "android.permission.VIBRATE",
+      "com.agentagenda.agent_agenda.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+      "com.android.alarm.permission.SET_ALARM"
+    ],
+    "application": {
+      "debuggable": null,
+      "allowBackup": "false",
+      "usesCleartextTraffic": "false",
+      "extractNativeLibs": "false"
+    }
+  },
+  "bundle_config": {
+    "bundletool": {
+      "version": "1.18.3"
+    },
+    "optimizations": {
+      "splitsConfig": {},
+      "uncompressNativeLibraries": {
+        "enabled": true,
+        "alignment": "PAGE_ALIGNMENT_16K"
+      },
+      "storeArchive": {
+        "enabled": true
+      }
+    },
+    "compression": {
+      "uncompressedGlob": [
+        "**.3[gG]2",
+        "**.3[gG][pP]",
+        "**.3[gG][pP][pP]",
+        "**.3[gG][pP][pP]2",
+        "**.[aA][aA][cC]",
+        "**.[aA][mM][rR]",
+        "**.[aA][wW][bB]",
+        "**.[gG][iI][fF]",
+        "**.[iI][mM][yY]",
+        "**.[jJ][eE][tT]",
+        "**.[jJ][pP][eE][gG]",
+        "**.[jJ][pP][gG]",
+        "**.[mM]4[aA]",
+        "**.[mM]4[vV]",
+        "**.[mM][iI][dD]",
+        "**.[mM][iI][dD][iI]",
+        "**.[mM][kK][vV]",
+        "**.[mM][pP]2",
+        "**.[mM][pP]3",
+        "**.[mM][pP]4",
+        "**.[mM][pP][eE][gG]",
+        "**.[mM][pP][gG]",
+        "**.[oO][gG][gG]",
+        "**.[oO][pP][uU][sS]",
+        "**.[pP][nN][gG]",
+        "**.[rR][tT][tT][tT][lL]",
+        "**.[sS][mM][fF]",
+        "**.[tT][fF][lL][iI][tT][eE]",
+        "**.[wW][aA][vV]",
+        "**.[wW][eE][bB][mM]",
+        "**.[wW][eE][bB][pP]",
+        "**.[wW][mM][aA]",
+        "**.[wW][mM][vV]",
+        "**.[xX][mM][fF]"
+      ]
+    }
+  }
+}

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../models/agenda_item.dart';
 
 /// Modal estilo Material 3 para crear una nueva actividad en la agenda.
@@ -113,7 +114,10 @@ class _NewActivitySheetState extends State<NewActivitySheet> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
+                borderSide: BorderSide(
+                  color: theme.colorScheme.primary,
+                  width: 2,
+                ),
               ),
             ),
           ),
@@ -135,7 +139,8 @@ class _NewActivitySheetState extends State<NewActivitySheet> {
                 return Padding(
                   padding: const EdgeInsets.only(right: 8.0),
                   child: FilterChip(
-                    label: Text('${cat.primaryEmoji} ${cat.label}'),
+                    avatar: Icon(cat.icon, size: 18),
+                    label: Text(cat.label),
                     selected: isSelected,
                     onSelected: (_) => setState(() => _selectedCategory = cat),
                     shape: RoundedRectangleBorder(

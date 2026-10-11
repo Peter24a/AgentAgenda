@@ -1,0 +1,27 @@
+{
+  "artifact": "AgentAgenda-2.0.3+10.aab",
+  "sha256": "bd629f9ff4ad06ad421b5a846aab338c85d2abd7f2347ff735bf9d10709c95c7",
+  "metadata_path": "BUNDLE-METADATA/com.android.tools/r8.json",
+  "r8_version": "9.1.31",
+  "dex_files": [
+    {
+      "path": "base/dex/classes.dex",
+      "uncompressed_bytes": 1915528
+    },
+    {
+      "path": "base/dex/classes2.dex",
+      "uncompressed_bytes": 198484
+    }
+  ],
+  "uncompressed_dex_bytes": 2114012,
+  "optimization_enabled": true,
+  "obfuscation_enabled": true,
+  "shrinking_enabled": true,
+  "full_mode": true,
+  "optimized_resource_shrinking": true,
+  "percentages": {
+    "optimization": 62.26,
+    "obfuscation": 63.33,
+    "shrinking": 63.19
+  }
+}

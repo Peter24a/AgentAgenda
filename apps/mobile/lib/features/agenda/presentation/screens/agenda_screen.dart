@@ -37,6 +37,7 @@ class _AgendaScreenState extends State<AgendaScreen>
   List<AgendaItem> _items = [];
   final Set<String> _pendingChanges = {};
   Timer? _clock;
+  final _assistantKey = GlobalKey();
 
   @override
   void initState() {
@@ -352,9 +353,10 @@ class _AgendaScreenState extends State<AgendaScreen>
               )
               .toList()
         : _items;
-    return Scaffold(
-      body: AgentScreenBorder(
-        child: SafeArea(
+    return AgentScreenBorder(
+      assistantKey: _assistantKey,
+      child: Scaffold(
+        body: SafeArea(
           child: RefreshIndicator(
             onRefresh: _fetchData,
             child: CustomScrollView(
@@ -512,12 +514,15 @@ class _AgendaScreenState extends State<AgendaScreen>
             ),
           ),
         ),
-      ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Align(
-          heightFactor: 1,
-          child: PremiumAgentButton(onTap: () => _openAgentChat()),
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: Align(
+            heightFactor: 1,
+            child: PremiumAgentButton(
+              surfaceKey: _assistantKey,
+              onTap: () => _openAgentChat(),
+            ),
+          ),
         ),
       ),
     );

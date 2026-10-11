@@ -103,7 +103,9 @@ class AppTheme {
         ),
         backgroundColor: colorScheme.surfaceContainer,
         selectedColor: colorScheme.primaryContainer,
-        labelStyle: TextStyle(color: colorScheme.onSurface),
+        labelStyle: textTheme.labelLarge?.copyWith(
+          color: colorScheme.onSurface,
+        ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(

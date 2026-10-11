@@ -1,6 +1,6 @@
 # AgentAgenda para Android
 
-Actualizado: 8 de octubre de 2026. App única para todos los espacios: paquete `com.agentagenda.agent_agenda`, versión 2.0.1+8. Conserva seguimientos locales voluntarios y acceso al despertador de Android.
+Actualizado: 10 de octubre de 2026. App única para todos los espacios: paquete `com.agentagenda.agent_agenda`, versión 2.0.3+10. Conserva seguimientos locales voluntarios y acceso al despertador de Android.
 
 ## Compilar y verificar
 

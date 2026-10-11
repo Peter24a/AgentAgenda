@@ -19,7 +19,7 @@ class ServiceLinks extends StatelessWidget {
       opened =
           await _channel.invokeMethod<bool>('openHttps', {'url': url}) ?? false;
     } on PlatformException {
-      // Show a copyable address if the device has no browser available.
+      // Offer copying the link if the device has no browser available.
     } on MissingPluginException {
       // Desktop test/preview hosts may not have the Android channel.
     }
@@ -28,11 +28,25 @@ class ServiceLinks extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Abrir en tu navegador'),
-        content: SelectableText(url),
+        content: const Text(
+          'No pudimos abrir el navegador. Copia el enlace para abrirlo donde prefieras.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cerrar'),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: url));
+              if (!context.mounted) return;
+              Navigator.pop(context);
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Enlace copiado')));
+            },
+            icon: const Icon(Icons.copy_rounded, size: 18),
+            label: const Text('Copiar enlace'),
           ),
         ],
       ),

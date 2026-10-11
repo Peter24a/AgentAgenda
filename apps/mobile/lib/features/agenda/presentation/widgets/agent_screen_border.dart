@@ -1,284 +1,340 @@
 import 'dart:math' as math;
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
+
 import '../../../../core/theme/beam_color_notifier.dart';
 
-/// Borde perimetral ultra optimizado para 120 FPS que recorre el dispositivo.
-/// Es una analogía dinámica al lazo del isotipo de SARA y al ciclo continuo de la agenda,
-/// adaptado milimétricamente al radio de esquinas del Pixel 10 Pro XL (49.0 dp de curvatura interior).
+/// A light ribbon that follows the screen and clears the assistant button.
 class AgentScreenBorder extends StatefulWidget {
   final Widget child;
+  final GlobalKey? assistantKey;
 
-  const AgentScreenBorder({super.key, required this.child});
+  const AgentScreenBorder({super.key, required this.child, this.assistantKey});
 
   @override
   State<AgentScreenBorder> createState() => _AgentScreenBorderState();
 }
 
 class _AgentScreenBorderState extends State<AgentScreenBorder>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _controller;
+  final _canvasKey = GlobalKey();
+  final _assistantBounds = ValueNotifier<Rect?>(null);
+  late final Listenable _repaint;
+  bool _measureScheduled = false;
+  bool _resumed = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 4000),
-    )..repeat();
+      duration: const Duration(seconds: 10),
+    );
+    _repaint = Listenable.merge([_controller, _assistantBounds]);
+    BeamColorConfig.isEnabled.addListener(_updateAnimation);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateAnimation();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _resumed = state == AppLifecycleState.resumed;
+    _updateAnimation();
+  }
+
+  void _updateAnimation() {
+    final animate =
+        BeamColorConfig.isEnabled.value &&
+        !MediaQuery.disableAnimationsOf(context) &&
+        TickerMode.valuesOf(context).enabled &&
+        _resumed;
+    if (animate && !_controller.isAnimating) {
+      _controller.repeat();
+    } else if (!animate) {
+      _controller.stop();
+    }
+  }
+
+  void _measureAssistant() {
+    if (_measureScheduled) return;
+    _measureScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _measureScheduled = false;
+      if (!mounted) return;
+      final canvas = _canvasKey.currentContext?.findRenderObject();
+      final button = widget.assistantKey?.currentContext?.findRenderObject();
+      _assistantBounds.value =
+          canvas is RenderBox &&
+              canvas.hasSize &&
+              button is RenderBox &&
+              button.hasSize
+          ? canvas.globalToLocal(button.localToGlobal(Offset.zero)) &
+                button.size
+          : null;
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    BeamColorConfig.isEnabled.removeListener(_updateAnimation);
     _controller.dispose();
+    _assistantBounds.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        widget.child,
-
-        ValueListenableBuilder<bool>(
-          valueListenable: BeamColorConfig.isEnabled,
-          builder: (context, isEnabled, _) {
-            if (!isEnabled) return const SizedBox.shrink();
-
-            return Positioned.fill(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Re-measure when text size or safe-area insets move the button.
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _measureAssistant();
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            widget.child,
+            Positioned.fill(
               child: IgnorePointer(
-                child: RepaintBoundary(
-                  child: ValueListenableBuilder<BeamThemeOption>(
-                    valueListenable: BeamColorConfig.currentOption,
-                    builder: (context, beamOption, _) {
-                      return ValueListenableBuilder<BeamPathStyle>(
-                        valueListenable: BeamColorConfig.currentPathStyle,
-                        builder: (context, pathStyle, _) {
-                          return AnimatedBuilder(
-                            animation: _controller,
-                            builder: (context, _) {
-                              return CustomPaint(
-                                painter: _FastPathMetricBeamPainter(
-                                  progress: _controller.value,
-                                  option: beamOption,
-                                  pathStyle: pathStyle,
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
+                child: ExcludeSemantics(
+                  child: RepaintBoundary(
+                    child: ListenableBuilder(
+                      listenable: Listenable.merge([
+                        BeamColorConfig.isEnabled,
+                        BeamColorConfig.currentOption,
+                        BeamColorConfig.currentPathStyle,
+                      ]),
+                      builder: (context, _) => CustomPaint(
+                        key: _canvasKey,
+                        painter:
+                            BeamColorConfig.isEnabled.value && !reduceMotion
+                            ? _RibbonPainter(
+                                animation: _controller,
+                                bounds: _assistantBounds,
+                                repaint: _repaint,
+                                option: BeamColorConfig.currentOption.value,
+                                pathStyle:
+                                    BeamColorConfig.currentPathStyle.value,
+                                isDark: isDark,
+                              )
+                            : null,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            );
-          },
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 }
 
-/// Pintor que utiliza [PathMetric] para garantizar velocidad lineal constante
-/// y curvatura idéntica a los 123 px (50.5 dp) del hardware del Pixel 10 Pro XL.
-class _FastPathMetricBeamPainter extends CustomPainter {
-  final double progress;
+class _RibbonPainter extends CustomPainter {
+  final Animation<double> animation;
+  final ValueNotifier<Rect?> bounds;
   final BeamThemeOption option;
   final BeamPathStyle pathStyle;
+  final bool isDark;
+  Size? _cachedSize;
+  Rect? _cachedBounds;
+  PathMetric? _metric;
 
-  _FastPathMetricBeamPainter({
-    required this.progress,
+  _RibbonPainter({
+    required this.animation,
+    required this.bounds,
+    required Listenable repaint,
     required this.option,
     required this.pathStyle,
-  });
+    required this.isDark,
+  }) : super(repaint: repaint);
+
+  PathMetric? _pathMetric(Size size) {
+    if (_cachedSize == size && _cachedBounds == bounds.value) return _metric;
+    _cachedSize = size;
+    _cachedBounds = bounds.value;
+    if (size.shortestSide < 24) return _metric = null;
+
+    const inset = 3.0;
+    final edge = (Offset.zero & size).deflate(inset);
+    final radius = math.min(44.0, size.shortestSide * 0.1);
+    final button = bounds.value;
+    final loop = pathStyle == BeamPathStyle.saraAssistantLoop && button != null
+        ? button.inflate(7)
+        : null;
+    // Leave room for the transition even on narrow screens or large text.
+    final bottomRadius = loop == null
+        ? radius
+        : math.min(radius, math.max(4.0, (edge.width - loop.width) / 2 - 6));
+    final path = Path()
+      ..moveTo(size.width / 2, edge.top)
+      ..lineTo(edge.right - radius, edge.top)
+      ..arcToPoint(
+        Offset(edge.right, edge.top + radius),
+        radius: Radius.circular(radius),
+      )
+      ..lineTo(edge.right, edge.bottom - bottomRadius)
+      ..arcToPoint(
+        Offset(edge.right - bottomRadius, edge.bottom),
+        radius: Radius.circular(bottomRadius),
+      );
+
+    if (loop != null &&
+        edge.contains(loop.topLeft) &&
+        edge.contains(loop.bottomRight)) {
+      final r = math.min(22.0, loop.height / 2);
+      final transition = math.max(
+        0.0,
+        (edge.width - loop.width) / 2 - bottomRadius,
+      );
+      // A single continuous arc skirts the button; it never crosses its label.
+      path
+        ..lineTo(loop.right + transition / 2, edge.bottom)
+        ..cubicTo(
+          loop.right,
+          edge.bottom,
+          loop.right,
+          loop.bottom,
+          loop.right,
+          loop.top + r,
+        )
+        ..arcToPoint(
+          Offset(loop.right - r, loop.top),
+          radius: Radius.circular(r),
+          clockwise: false,
+        )
+        ..lineTo(loop.left + r, loop.top)
+        ..arcToPoint(
+          Offset(loop.left, loop.top + r),
+          radius: Radius.circular(r),
+          clockwise: false,
+        )
+        ..cubicTo(
+          loop.left,
+          loop.bottom,
+          loop.left,
+          edge.bottom,
+          loop.left - transition / 2,
+          edge.bottom,
+        );
+    }
+    path
+      ..lineTo(edge.left + bottomRadius, edge.bottom)
+      ..arcToPoint(
+        Offset(edge.left, edge.bottom - bottomRadius),
+        radius: Radius.circular(bottomRadius),
+      )
+      ..lineTo(edge.left, edge.top + radius)
+      ..arcToPoint(
+        Offset(edge.left + radius, edge.top),
+        radius: Radius.circular(radius),
+      )
+      ..close();
+    return _metric = path.computeMetrics().first;
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (size.width <= 0 || size.height <= 0) return;
-
-    // Medidas exactas del hardware Pixel 10 Pro XL (1080x2404 a 390dpi = 443x986dp)
-    // Radio de esquinas físico: 123px / 2.4375 ≈ 50.46 dp. Con inset 1.5 dp => r = 49.0 dp.
-    const inset = 1.5;
-    final r = size.width > 400 ? 49.0 : 42.0;
-
-    final x0 = inset;
-    final y0 = inset;
-    final x1 = size.width - inset;
-    final y1 = size.height - inset;
-    final cx = size.width / 2;
-
-    final path = Path();
-    path.moveTo(cx, y0);
-
-    // 1. Borde superior derecho
-    path.lineTo(x1 - r, y0);
-    path.arcToPoint(Offset(x1, y0 + r), radius: Radius.circular(r));
-
-    // 2. Borde lateral derecho
-    path.lineTo(x1, y1 - r);
-    path.arcToPoint(Offset(x1 - r, y1), radius: Radius.circular(r));
-
-    // 3. Borde inferior con opción de Bucle SARA en el Asistente
-    if (pathStyle == BeamPathStyle.saraAssistantLoop) {
-      // Línea hasta el umbral del botón del asistente
-      path.lineTo(cx + 145, y1);
-
-      // Bucle suave que envuelve y sobrevuela el botón en un lazo continuo SARA
-      // Sube y rodea la cresta superior del botón
-      path.cubicTo(cx + 80, y1, cx + 60, y1 - 90, cx, y1 - 90);
-      // Desciende haciendo el lazo cruzado interior
-      path.cubicTo(cx - 60, y1 - 90, cx - 80, y1 - 28, cx, y1 - 28);
-      // Bucle interior del isotipo
-      path.cubicTo(cx + 45, y1 - 28, cx + 45, y1 - 70, cx, y1 - 70);
-      // Salida continua hacia el borde inferior izquierdo
-      path.cubicTo(cx - 45, y1 - 70, cx - 80, y1, cx - 145, y1);
-
-      path.lineTo(x0 + r, y1);
-    } else {
-      path.lineTo(x0 + r, y1);
-    }
-
-    // 4. Borde inferior izquierdo
-    path.arcToPoint(Offset(x0, y1 - r), radius: Radius.circular(r));
-
-    // 5. Borde lateral izquierdo
-    path.lineTo(x0, y0 + r);
-    path.arcToPoint(Offset(x0 + r, y0), radius: Radius.circular(r));
-
-    path.close();
-
-    final metrics = path.computeMetrics().toList();
-    if (metrics.isEmpty) return;
-    final metric = metrics.first;
-    final totalLength = metric.length;
-    if (totalLength <= 0) return;
-
-    // Longitud física del lazo luminoso (aprox. 260 dp)
-    final beamLength = math.min(size.height * 0.28, 265.0);
-    final headDist = (progress * totalLength) % totalLength;
-
-    // Subdivisión en segmentos para degradado suave con velocidad lineal constante
-    const segments = 14;
-    final segLen = beamLength / segments;
-
-    // Preparar colores del lazo
-    final isSara = option.name.contains('SARA');
-    final isMulti = option.isMulticolor;
-    final primaryColor = isSara ? const Color(0xFF6B4F73) : option.primaryColor;
-    final accentColor = isSara ? const Color(0xFFC5AED0) : option.primaryColor;
-
-    // 1. Pase ambiental difuso (aura exterior amplia)
-    final auraPath = _extractSubPath(metric, totalLength, headDist - beamLength, headDist);
-    final auraPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 20.0
-      ..strokeCap = StrokeCap.round
-      ..color = primaryColor.withValues(alpha: 0.22)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9.0);
-    canvas.drawPath(auraPath, auraPaint);
-
-    // 2. Pase de halo medio (resplandor de cuerpo)
-    final haloPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 12.0
-      ..strokeCap = StrokeCap.round
-      ..color = accentColor.withValues(alpha: 0.46)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.5);
-    canvas.drawPath(auraPath, haloPaint);
-
-    // 3. Pase principal: Núcleo trazado con gradiente progresivo y grosor calibrado
-    for (int i = 0; i < segments; i++) {
-      final t = (i + 1) / segments;
-      final start = headDist - beamLength + (i * segLen);
-      final end = headDist - beamLength + ((i + 1) * segLen) + 2.0; // Traslape amplio para continuidad
-
-      final segPath = _extractSubPath(metric, totalLength, start, end);
-
-      Color segColor;
-      if (isSara) {
-        if (t < 0.35) {
-          segColor = const Color(0xFF6B4F73).withValues(alpha: 0.25 + (t / 0.35) * 0.45);
-        } else if (t < 0.70) {
-          final factor = (t - 0.35) / 0.35;
-          segColor = Color.lerp(const Color(0xFF6B4F73), const Color(0xFF9E80A8), factor)!
-              .withValues(alpha: 0.70 + factor * 0.22);
-        } else if (t < 0.90) {
-          final factor = (t - 0.70) / 0.20;
-          segColor = Color.lerp(const Color(0xFF9E80A8), const Color(0xFFC5AED0), factor)!
-              .withValues(alpha: 0.92 + factor * 0.08);
-        } else {
-          segColor = Colors.white;
-        }
-      } else if (isMulti) {
-        final colors = option.colors;
-        final idx = (t * (colors.length - 1)).clamp(0, colors.length - 1).toInt();
-        segColor = (t > 0.92 ? Colors.white : colors[idx]).withValues(alpha: 0.35 + t * 0.65);
-      } else {
-        segColor = (t > 0.90
-                ? Colors.white
-                : Color.lerp(option.primaryColor, Colors.white, t * 0.4)!)
-            .withValues(alpha: 0.25 + t * 0.75);
-      }
-
-      // Grosor sólido y visible: desde 3.2 dp en la cola hasta 7.2 dp en la cabeza
-      final strokeW = 3.2 + (t * 4.0);
-      final segPaint = Paint()
+    final metric = _pathMetric(size);
+    if (metric == null || metric.length <= 0) return;
+    final length = math.min(220.0, metric.length * 0.12);
+    final head = animation.value * metric.length;
+    final ribbon = _extract(metric, head - length, head);
+    canvas.drawPath(
+      ribbon,
+      Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeW
+        ..strokeWidth = 7
         ..strokeCap = StrokeCap.round
-        ..color = segColor;
+        ..color = option.primaryColor.withValues(alpha: isDark ? 0.2 : 0.12)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+    );
 
-      canvas.drawPath(segPath, segPaint);
+    // A single colored mesh avoids darker seams between translucent strokes.
+    const segments = 80;
+    final positions = <Offset>[];
+    final colors = <Color>[];
+    final palette = option.colors.isEmpty
+        ? [option.primaryColor]
+        : option.colors;
+    Color colorAt(double t) {
+      final position = t * (palette.length - 1);
+      final index = position.floor();
+      var color = Color.lerp(
+        palette[index],
+        palette[math.min(index + 1, palette.length - 1)],
+        position - index,
+      )!;
+      if (!isDark && color.computeLuminance() > 0.7) {
+        color = Color.lerp(color, const Color(0xFF6B4F73), 0.38)!;
+      }
+      return color.withValues(alpha: t * (isDark ? 0.92 : 0.8));
     }
 
-    // 4. Cabeza luminosa de alto impacto con chispa perla
-    final tangent = metric.getTangentForOffset(headDist);
-    if (tangent != null) {
-      final headPos = tangent.position;
+    void addSection(Offset point, Offset direction, double width, Color color) {
+      final normal = Offset(-direction.dy, direction.dx) * (width / 2);
+      positions.addAll([point + normal, point - normal]);
+      colors.addAll([color, color]);
+    }
 
-      // Resplandor difuso en la punta
-      canvas.drawCircle(
-        headPos,
-        10.0,
-        Paint()
-          ..color = accentColor.withValues(alpha: 0.80)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0),
+    for (var i = 0; i <= segments; i++) {
+      final t = i / segments;
+      final tangent = metric.getTangentForOffset(
+        (head - length + t * length) % metric.length,
       );
-
-      // Núcleo blanco nítido
-      canvas.drawCircle(
-        headPos,
-        4.2,
+      if (tangent == null) continue;
+      addSection(tangent.position, tangent.vector, 1.1 + t * 1.3, colorAt(t));
+    }
+    final tip = metric.getTangentForOffset(head);
+    if (tip != null) {
+      for (var i = 1; i <= 4; i++) {
+        final angle = i / 4 * math.pi / 2;
+        addSection(
+          tip.position + tip.vector * (1.2 * math.sin(angle)),
+          tip.vector,
+          2.4 * math.cos(angle),
+          colorAt(1),
+        );
+      }
+    }
+    if (positions.length >= 4) {
+      final mesh = Vertices(
+        VertexMode.triangleStrip,
+        positions,
+        colors: colors,
+      );
+      canvas.drawVertices(
+        mesh,
+        BlendMode.modulate,
         Paint()..color = Colors.white,
       );
+      mesh.dispose();
     }
   }
 
-  Path _extractSubPath(PathMetric metric, double totalLength, double start, double end) {
-    var s = start % totalLength;
-    var e = end % totalLength;
-
-    if (start < 0 && end <= 0) {
-      s = (start % totalLength + totalLength) % totalLength;
-      e = (end % totalLength + totalLength) % totalLength;
-    }
-
-    if (s <= e) {
-      return metric.extractPath(s, e);
-    } else {
-      final p = Path();
-      p.addPath(metric.extractPath(s, totalLength), Offset.zero);
-      p.addPath(metric.extractPath(0, e), Offset.zero);
-      return p;
-    }
+  Path _extract(PathMetric metric, double start, double end) {
+    final s = start % metric.length;
+    final e = end % metric.length;
+    if (s <= e) return metric.extractPath(s, e);
+    return Path()
+      ..addPath(metric.extractPath(s, metric.length), Offset.zero)
+      ..addPath(metric.extractPath(0, e), Offset.zero);
   }
 
   @override
-  bool shouldRepaint(covariant _FastPathMetricBeamPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.option != option ||
-        oldDelegate.pathStyle != pathStyle;
-  }
+  bool shouldRepaint(covariant _RibbonPainter oldDelegate) =>
+      oldDelegate.option != option ||
+      oldDelegate.pathStyle != pathStyle ||
+      oldDelegate.isDark != isDark ||
+      oldDelegate.animation != animation ||
+      oldDelegate.bounds != bounds;
 }

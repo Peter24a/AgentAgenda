@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-/// Notificador y opciones para el lazo luminoso ("gusanito").
+/// Opciones de color y recorrido del lazo de luz.
 class BeamColorConfig {
   BeamColorConfig._();
 
   static const List<BeamThemeOption> options = [
     BeamThemeOption(
-      name: 'Ciruela SARA (Logo)',
+      name: 'Ciruela SARA',
       primaryColor: Color(0xFF6B4F73),
       colors: [
         Color(0xFF6B4F73), // Ciruela institucional SARA
@@ -17,7 +17,7 @@ class BeamColorConfig {
       isMulticolor: false,
     ),
     BeamThemeOption(
-      name: 'Multicolor Google',
+      name: 'Multicolor',
       isMulticolor: true,
       primaryColor: Color(0xFF4285F4),
       colors: [
@@ -30,32 +30,32 @@ class BeamColorConfig {
       ],
     ),
     BeamThemeOption(
-      name: 'Malva Tonal',
+      name: 'Malva',
       primaryColor: Color(0xFFC5AED0),
       colors: [Color(0xFFC5AED0)],
     ),
     BeamThemeOption(
-      name: 'Blanco Perla',
+      name: 'Perla',
       primaryColor: Color(0xFFFFFFFF),
       colors: [Color(0xFFFFFFFF)],
     ),
     BeamThemeOption(
-      name: 'Azul Google',
+      name: 'Azul',
       primaryColor: Color(0xFF8AB4F8),
       colors: [Color(0xFF8AB4F8)],
     ),
     BeamThemeOption(
-      name: 'Cian Pixel',
+      name: 'Menta',
       primaryColor: Color(0xFF53DBC9),
       colors: [Color(0xFF53DBC9)],
     ),
     BeamThemeOption(
-      name: 'Oro Champagne',
+      name: 'Dorado',
       primaryColor: Color(0xFFFDD663),
       colors: [Color(0xFFFDD663)],
     ),
     BeamThemeOption(
-      name: 'Coral Atardecer',
+      name: 'Coral',
       primaryColor: Color(0xFFF28B82),
       colors: [Color(0xFFF28B82)],
     ),
@@ -72,13 +72,10 @@ class BeamColorConfig {
 
 enum BeamPathStyle {
   saraAssistantLoop(
-    'Bucle SARA en Asistente',
-    'El lazo desciende por el bisel y realiza un bucle en el botón del asistente.',
+    'Junto al asistente',
+    'La luz recorre el borde y rodea el botón del asistente.',
   ),
-  fullBezel(
-    'Bisel Perimetral Completo',
-    'El lazo recorre el contorno exterior adaptado al radio de pantalla.',
-  );
+  fullBezel('Todo el contorno', 'La luz sigue el borde de la pantalla.');
 
   final String label;
   final String description;

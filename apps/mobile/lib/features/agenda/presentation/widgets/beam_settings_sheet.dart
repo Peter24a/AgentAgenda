@@ -6,8 +6,7 @@ import '../../../../core/service_links.dart';
 import '../../../../core/theme/beam_color_notifier.dart';
 import '../../../../core/theme/color_schemes.dart';
 
-/// Modal de ajustes y configuración del servidor backend para SARA Agenda.
-/// Cumple con la Identidad Visual SARA v0.4.0 (radio modal 16px, controles 8px, cero degradados).
+/// Ajustes de apariencia y conexión del espacio.
 class BeamSettingsSheet extends StatefulWidget {
   const BeamSettingsSheet({super.key});
 
@@ -33,8 +32,9 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
       _testingConnection = false;
       _connectionSuccess = connected;
       _connectionStatus = connected
-          ? 'Espacio y dispositivo verificados'
-          : ApiClient.instance.sessions.message;
+          ? 'Tu espacio está conectado.'
+          : ApiClient.instance.sessions.message ??
+                'Conecta tu espacio para continuar.';
     });
   }
 
@@ -66,94 +66,49 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
             children: [
               Icon(Icons.tune_rounded, size: 22, color: colorScheme.primary),
               const SizedBox(width: 10),
-              Text(
-                'Ajustes de AgentAgenda',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: colorScheme.onSurface,
+              Expanded(
+                child: Text(
+                  'Ajustes',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 6),
           Text(
-            'Identidad Visual Unificada SARA v0.4.0 · Comunidad FIME',
+            'Personaliza tu agenda y administra tu espacio.',
             style: theme.textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 16),
-
-          // Tarjeta de información de la identidad
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: colorScheme.secondaryContainer,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: colorScheme.outlineVariant, width: 1.0),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 16,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Firma de Marca: Ciruela SARA',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        isDark
-                            ? '#C5AED0 en modo oscuro'
-                            : '#6B4F73 en modo claro',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           const Divider(height: 1),
           const SizedBox(height: 18),
 
           Row(
             children: [
               Icon(
-                Icons.all_inclusive_rounded,
+                Icons.auto_awesome_outlined,
                 size: 20,
                 color: colorScheme.primary,
               ),
               const SizedBox(width: 10),
-              Text(
-                'Lazo Perimetral (Analogía al Isotipo)',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
+              Expanded(
+                child: Text(
+                  'Lazo de luz',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 6),
           Text(
-            'Lazo de luz que recorre el borde del dispositivo, simbolizando el flujo continuo y la identidad de SARA.',
+            'Elige cómo se ilumina el borde de tu pantalla.',
             style: theme.textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -169,13 +124,13 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
                   SwitchListTile.adaptive(
                     value: enabled,
                     onChanged: (val) => BeamColorConfig.isEnabled.value = val,
-                    title: const Text('Activar lazo perimetral'),
+                    title: const Text('Mostrar lazo de luz'),
                     contentPadding: EdgeInsets.zero,
                   ),
                   if (enabled) ...[
                     const SizedBox(height: 12),
                     Text(
-                      'Trayectoria del lazo:',
+                      'Recorrido',
                       style: theme.textTheme.labelMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -187,64 +142,68 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
                         return Column(
                           children: BeamPathStyle.values.map((style) {
                             final isSelected = style == currentStyle;
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              decoration: BoxDecoration(
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Material(
                                 color: isSelected
                                     ? colorScheme.secondaryContainer
                                     : colorScheme.surfaceContainerLow,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? colorScheme.primary
-                                      : colorScheme.outlineVariant,
-                                  width: isSelected ? 1.5 : 1.0,
-                                ),
-                              ),
-                              child: ListTile(
-                                dense: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 2,
-                                ),
-                                leading: Icon(
-                                  style == BeamPathStyle.saraAssistantLoop
-                                      ? Icons.all_inclusive_rounded
-                                      : Icons.crop_square_rounded,
-                                  color: isSelected
-                                      ? colorScheme.primary
-                                      : colorScheme.onSurfaceVariant,
-                                ),
-                                title: Text(
-                                  style.label,
-                                  style: theme.textTheme.labelMedium?.copyWith(
-                                    fontWeight: isSelected
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  side: BorderSide(
                                     color: isSelected
-                                        ? colorScheme.onSecondaryContainer
-                                        : colorScheme.onSurface,
+                                        ? colorScheme.primary
+                                        : colorScheme.outlineVariant,
+                                    width: isSelected ? 1.5 : 1.0,
                                   ),
                                 ),
-                                subtitle: Text(
-                                  style.description,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                    fontSize: 11,
+                                clipBehavior: Clip.antiAlias,
+                                child: ListTile(
+                                  selected: isSelected,
+                                  dense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 2,
                                   ),
+                                  leading: Icon(
+                                    style == BeamPathStyle.saraAssistantLoop
+                                        ? Icons.all_inclusive_rounded
+                                        : Icons.crop_square_rounded,
+                                    color: isSelected
+                                        ? colorScheme.primary
+                                        : colorScheme.onSurfaceVariant,
+                                  ),
+                                  title: Text(
+                                    style.label,
+                                    style: theme.textTheme.labelMedium
+                                        ?.copyWith(
+                                          fontWeight: isSelected
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                          color: isSelected
+                                              ? colorScheme.onSecondaryContainer
+                                              : colorScheme.onSurface,
+                                        ),
+                                  ),
+                                  subtitle: Text(
+                                    style.description,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  trailing: Icon(
+                                    isSelected
+                                        ? Icons.radio_button_checked_rounded
+                                        : Icons.radio_button_unchecked_rounded,
+                                    color: isSelected
+                                        ? colorScheme.primary
+                                        : colorScheme.outline,
+                                    size: 20,
+                                  ),
+                                  onTap: () =>
+                                      BeamColorConfig.currentPathStyle.value =
+                                          style,
                                 ),
-                                trailing: Icon(
-                                  isSelected
-                                      ? Icons.radio_button_checked_rounded
-                                      : Icons.radio_button_unchecked_rounded,
-                                  color: isSelected
-                                      ? colorScheme.primary
-                                      : colorScheme.outline,
-                                  size: 20,
-                                ),
-                                onTap: () =>
-                                    BeamColorConfig.currentPathStyle.value =
-                                        style,
                               ),
                             );
                           }).toList(),
@@ -253,7 +212,7 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Paleta cromática:',
+                      'Color',
                       style: theme.textTheme.labelMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -300,16 +259,75 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
 
           Text('Tu espacio', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
-          Text(
-            ApiClient.instance.sessions.session?.spaceName ?? 'Sin conectar',
+          ListenableBuilder(
+            listenable: ApiClient.instance.sessions,
+            builder: (context, _) {
+              final sessions = ApiClient.instance.sessions;
+              final (icon, status) = switch (sessions.state) {
+                session.ConnectionState.connected => (
+                  Icons.cloud_done_outlined,
+                  'Conectado',
+                ),
+                session.ConnectionState.checking => (
+                  Icons.sync_rounded,
+                  'Verificando conexión…',
+                ),
+                session.ConnectionState.unavailable => (
+                  Icons.cloud_off_outlined,
+                  'Sin conexión por el momento',
+                ),
+                session.ConnectionState.disconnected => (
+                  Icons.link_off_rounded,
+                  'Sin conectar',
+                ),
+              };
+              return Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: colorScheme.outlineVariant),
+                ),
+                child: Row(
+                  children: [
+                    Icon(icon, color: colorScheme.primary, size: 22),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            sessions.session?.spaceName ??
+                                'Tu espacio personal',
+                            style: theme.textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            status,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
-          const SizedBox(height: 4),
-          Text(ApiClient.instance.baseUrl, style: theme.textTheme.bodySmall),
           const SizedBox(height: 16),
           OutlinedButton.icon(
             onPressed: _testingConnection ? null : _testConnection,
-            icon: const Icon(Icons.verified_user_outlined),
-            label: const Text('Verificar conexión y sesión'),
+            icon: _testingConnection
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh_rounded),
+            label: Text(
+              _testingConnection ? 'Verificando…' : 'Comprobar conexión',
+            ),
           ),
           TextButton.icon(
             onPressed: () async {
@@ -318,7 +336,7 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
                 builder: (context) => AlertDialog(
                   title: const Text('¿Desconectar este teléfono?'),
                   content: const Text(
-                    'Tu contenido permanece en el servidor. Necesitarás un código nuevo para volver a conectar este teléfono o cambiar de espacio.',
+                    'Tu contenido seguirá guardado en tu espacio. Necesitarás un código nuevo para volver a conectar este teléfono o cambiar de espacio.',
                   ),
                   actions: [
                     TextButton(
@@ -344,7 +362,7 @@ class _BeamSettingsSheetState extends State<BeamSettingsSheet> {
             onPressed: () => showLicensePage(
               context: context,
               applicationName: 'AgentAgenda',
-              applicationVersion: '2.0.1',
+              applicationVersion: '2.0.3',
             ),
             icon: const Icon(Icons.description_outlined, size: 18),
             label: const Text('Licencias de código abierto'),

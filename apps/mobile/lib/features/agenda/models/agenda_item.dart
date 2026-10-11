@@ -3,61 +3,52 @@ import 'package:intl/intl.dart';
 
 import '../../../core/time/canonical_timestamp.dart';
 
-/// Categorías de actividades con identidad visual Pixel.
+/// Categorías de actividades con un icono y color propios.
 enum ActivityCategory {
   sleep(
-    label: 'Dormir & Descanso',
-    primaryEmoji: '🌙',
-    backgroundEmojis: ['✨', '🌙', '💤', '⭐', '🌌'],
+    label: 'Dormir y descanso',
+    icon: Icons.bedtime_outlined,
     tintColor: Color(0xFF5C6BC0),
   ),
   work(
-    label: 'Trabajo & Enfoque',
-    primaryEmoji: '💼',
-    backgroundEmojis: ['💻', '⚡', '📊', '🎯', '📁'],
+    label: 'Trabajo y enfoque',
+    icon: Icons.work_outline_rounded,
     tintColor: Color(0xFF0288D1),
   ),
   food(
-    label: 'Comida & Café',
-    primaryEmoji: '☕',
-    backgroundEmojis: ['☕', '🥐', '🥑', '🥞', '🍽️'],
+    label: 'Comida y café',
+    icon: Icons.restaurant_rounded,
     tintColor: Color(0xFFF57C00),
   ),
   exercise(
-    label: 'Ejercicio & Salud',
-    primaryEmoji: '🏃',
-    backgroundEmojis: ['🏃', '💪', '🔥', '👟', '🚴'],
+    label: 'Ejercicio y salud',
+    icon: Icons.directions_run_rounded,
     tintColor: Color(0xFF43A047),
   ),
   study(
-    label: 'Estudio & Lectura',
-    primaryEmoji: '📚',
-    backgroundEmojis: ['📚', '💡', '✍️', '🧠', '📖'],
+    label: 'Estudio y lectura',
+    icon: Icons.menu_book_rounded,
     tintColor: Color(0xFF8E24AA),
   ),
   leisure(
-    label: 'Ocio & Social',
-    primaryEmoji: '🎮',
-    backgroundEmojis: ['🎮', '🍿', '🎧', '✨', '🎉'],
+    label: 'Ocio y vida social',
+    icon: Icons.sports_esports_outlined,
     tintColor: Color(0xFFE91E63),
   ),
   general(
     label: 'General',
-    primaryEmoji: '📌',
-    backgroundEmojis: ['📌', '⭐', '🗓️', '✨', '⏰'],
+    icon: Icons.event_note_rounded,
     tintColor: Color(0xFF00897B),
   );
 
   const ActivityCategory({
     required this.label,
-    required this.primaryEmoji,
-    required this.backgroundEmojis,
+    required this.icon,
     required this.tintColor,
   });
 
   final String label;
-  final String primaryEmoji;
-  final List<String> backgroundEmojis;
+  final IconData icon;
   final Color tintColor;
 }
 

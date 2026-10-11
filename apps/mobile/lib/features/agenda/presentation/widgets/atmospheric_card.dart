@@ -11,7 +11,7 @@ class AtmosphericCard extends StatelessWidget {
     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
     child: ListTile(
       onTap: onTap,
-      leading: Text(item.category.primaryEmoji),
+      leading: Icon(item.category.icon, color: item.category.tintColor),
       title: Text(item.title),
       subtitle: Text('${item.timeRange}\n${item.description ?? ""}'),
       trailing: const Icon(Icons.chevron_right),

@@ -6,8 +6,9 @@ import '../../../../core/branding/sara_brand_mark.dart';
 /// Opens the assistant with the official SARA mark and a short scale response.
 class PremiumAgentButton extends StatefulWidget {
   final VoidCallback onTap;
+  final GlobalKey? surfaceKey;
 
-  const PremiumAgentButton({super.key, required this.onTap});
+  const PremiumAgentButton({super.key, required this.onTap, this.surfaceKey});
 
   @override
   State<PremiumAgentButton> createState() => _PremiumAgentButtonState();
@@ -57,7 +58,9 @@ class _PremiumAgentButtonState extends State<PremiumAgentButton>
 
     // Preserve the tactile response and navigation guard.
     HapticFeedback.mediumImpact();
-    _scaleController.forward(from: 0.0);
+    if (!MediaQuery.disableAnimationsOf(context)) {
+      _scaleController.forward(from: 0.0);
+    }
 
     // Let the press response finish before opening the assistant.
     Future.delayed(const Duration(milliseconds: 250), () {
@@ -82,66 +85,46 @@ class _PremiumAgentButtonState extends State<PremiumAgentButton>
     final isDark = theme.brightness == Brightness.dark;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Stack(
-        alignment: Alignment.center,
-        clipBehavior: Clip.none,
-        children: [
-          // Botón físico interactivo
-          ScaleTransition(
-            scale: _scaleAnimation,
-            child: Material(
-              color: colorScheme.primary,
-              borderRadius: BorderRadius.circular(12),
-              elevation: isDark ? 0 : 3,
-              shadowColor: Colors.black.withValues(alpha: 0.25),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: _handleTap,
-                splashColor: (isDark ? Colors.black : Colors.white).withValues(
-                  alpha: 0.15,
-                ),
-                highlightColor: (isDark ? Colors.black : Colors.white)
-                    .withValues(alpha: 0.08),
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: 48),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 320),
+        child: ScaleTransition(
+          scale: _scaleAnimation,
+          child: Material(
+            key: widget.surfaceKey,
+            color: colorScheme.primary,
+            borderRadius: BorderRadius.circular(18),
+            elevation: isDark ? 0 : 1,
+            shadowColor: colorScheme.primary.withValues(alpha: 0.16),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: _handleTap,
+              splashColor: colorScheme.onPrimary.withValues(alpha: 0.12),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 54),
+                child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isDark ? colorScheme.outline : Colors.transparent,
-                      width: 1.0,
-                    ),
+                    vertical: 14,
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      SaraBrandMark(size: 20, color: colorScheme.onPrimary),
-                      const SizedBox(width: 10),
-                      Text(
-                        'Asistente SARA',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: colorScheme.onPrimary,
-                          letterSpacing: 0.2,
+                      SaraBrandMark(size: 24, color: colorScheme.onPrimary),
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: Text(
+                          'Asistente SARA',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: colorScheme.onPrimary,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '· Planear día',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w400,
-                          color: colorScheme.onPrimary.withValues(alpha: 0.85),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 16),
                       Icon(
                         Icons.arrow_forward_rounded,
-                        size: 16,
+                        size: 18,
                         color: colorScheme.onPrimary.withValues(alpha: 0.85),
                       ),
                     ],
@@ -150,7 +133,7 @@ class _PremiumAgentButtonState extends State<PremiumAgentButton>
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }

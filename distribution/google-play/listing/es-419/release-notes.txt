@@ -1,5 +1,6 @@
-AgentAgenda 2.0.2
-• Identidad visual SARA unificada en la app y su ficha de Play.
-• Icono adaptable a la forma y al tema de tu pantalla de inicio.
-• Símbolo oficial en la activación y el botón del asistente.
-• Agenda, archivos y conversaciones conservados en tu espacio personal.
+AgentAgenda 2.0.3
+• Lazo de luz más suave y preciso alrededor del asistente.
+• Ajustes más claros, sin direcciones técnicas ni textos de diseño.
+• Iconos consistentes en las categorías de actividades.
+• Mejor adaptación del botón del asistente a letras grandes y pantallas pequeñas.
+• Respeto a la preferencia de reducir animaciones.
