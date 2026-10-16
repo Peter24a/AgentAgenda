@@ -171,7 +171,9 @@ def _times(text: str) -> tuple[time | None, time | None, int, str | None]:
             amount += 30 if m[3] == 'media' else 15
         duration = amount
     if duration is None:
-        m = re.search(r"\b(media hora|una hora y media|una hora|dos horas|\d+\s*(?:horas?|minutos?))\b", text)
+        # A clock suffix such as "14:30 hora de Ciudad de México" does not
+        # mean thirty hours. The duration may not begin inside a clock token.
+        m = re.search(r"(?<![:\d])\b(media hora|una hora y media|una hora|dos horas|\d+\s*(?:horas?|minutos?))\b", text)
         if m:
             if m[1] == 'media hora':
                 duration = 30

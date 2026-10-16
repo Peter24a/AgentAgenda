@@ -38,6 +38,14 @@ def test_calendar_crosses_year_boundary():
     assert plan.reply is None
 
 
+@pytest.mark.parametrize('suffix', ['hora de Ciudad de México', 'horas, hora local', 'hora de México, categoría general'])
+def test_clock_timezone_suffix_is_not_a_duration(suffix):
+    plan = _plan(f'Propone crear un evento el 2026-10-30 de 14:00 a 14:30 {suffix}. No lo guardes hasta confirmar.', NOW, None)
+    assert plan.reply is None
+    assert plan.start_clock == time(14)
+    assert plan.end_clock == time(14, 30)
+
+
 @pytest.mark.parametrize(('message','missing'), [
     ('Agenda llamada', {'date','clock','duration'}),
     ('Agenda llamada mañana a las 3', {'clock_ambiguous','duration'}),
