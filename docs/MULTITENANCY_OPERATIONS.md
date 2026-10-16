@@ -2,6 +2,13 @@
 
 Despliegue del 8 de octubre de 2026, en `cite-server`. Este documento describe la plataforma implementada; el [plan de migración](MULTITENANCY_MIGRATION_PLAN.md) conserva las decisiones y el diseño previo. Las credenciales, códigos de activación, manifiestos privados y contenidos de clientes permanecen fuera de Git.
 
+## Actualización del panel
+
+Desde el 15 de octubre de 2026 la administración utiliza SARA ID con autorización
+explícita por UUID. El detalle de espacio incorpora historial de códigos y conteos
+agregados de dispositivos. El [registro del despliegue](operations/2026-10-15-admin-sara-auth.md)
+describe las verificaciones y los límites de esta entrega.
+
 ## Entrada y recursos desplegados
 
 La dirección pública es `https://agenda-api.pedroibarra.dev`. El túnel existente de Cloudflare continúa llegando a `127.0.0.1:8001`, donde ahora escucha la plataforma. No se crea DNS ni otro túnel al dar de alta un cliente.
