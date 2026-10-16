@@ -61,7 +61,20 @@ class Registry:
                     created_at REAL NOT NULL, completed_at REAL,
                     PRIMARY KEY (credential_id, request_id)
                 );
+                CREATE TABLE IF NOT EXISTS sara_flows (
+                    state_hash TEXT PRIMARY KEY, browser_hash TEXT NOT NULL,
+                    payload TEXT, expires_at REAL NOT NULL, status TEXT NOT NULL,
+                    session_hash TEXT
+                );
             """)
+            # Add metadata without changing existing codes or durable activation receipts.
+            columns = {row[1] for row in db.execute("PRAGMA table_info(invitations)")}
+            for name, kind in (("id", "TEXT"), ("created_at", "REAL"), ("revoked_at", "REAL")):
+                if name not in columns:
+                    db.execute(f"ALTER TABLE invitations ADD COLUMN {name} {kind}")
+            for row in db.execute("SELECT code_hash FROM invitations WHERE id IS NULL").fetchall():
+                db.execute("UPDATE invitations SET id=? WHERE code_hash=?", (str(uuid.uuid4()), row[0]))
+            db.execute("CREATE UNIQUE INDEX IF NOT EXISTS invitation_id ON invitations(id)")
         Path(path).chmod(0o600)
 
     @contextmanager
@@ -150,12 +163,36 @@ class Registry:
         if space["state"] != "ready" or not space["backend_url"] or not space["enrollment_key"]:
             raise RegistryError(423, "Espacio no disponible")
         code = secrets.token_urlsafe(24)
-        expiry = time.time() + ttl
+        now, invitation_id = time.time(), str(uuid.uuid4())
+        expiry = now + ttl
         with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
             # A replacement invitation invalidates unclaimed codes only; reserved operations remain retryable.
-            db.execute("DELETE FROM invitations WHERE space_id=? AND operation_id IS NULL", (space_id,))
-            db.execute("INSERT INTO invitations(code_hash,space_id,purpose,replace_device_id,expires_at) VALUES(?,?,?,?,?)", (digest(code), space_id, purpose, replace_device_id, expiry))
-        return {"code": code, "expires_at": expiry, "purpose": purpose}
+            db.execute("UPDATE invitations SET revoked_at=? WHERE space_id=? AND operation_id IS NULL AND revoked_at IS NULL AND expires_at>=?", (now, space_id, now))
+            db.execute("INSERT INTO invitations(code_hash,space_id,purpose,replace_device_id,expires_at,id,created_at) VALUES(?,?,?,?,?,?,?)", (digest(code), space_id, purpose, replace_device_id, expiry, invitation_id, now))
+        return {"id": invitation_id, "code": code, "expires_at": expiry, "purpose": purpose}
+
+    def list_invitations(self, space_id: str):
+        """Return operational history only; never return codes, hashes or device receipts."""
+        now = time.time()
+        with self.connect() as db:
+            rows = db.execute("SELECT id,purpose,created_at,expires_at,completed_at,revoked_at,operation_id FROM invitations WHERE space_id=? ORDER BY rowid DESC LIMIT 100", (space_id,)).fetchall()
+        result = []
+        for row in rows:
+            item = dict(row)
+            reserved = item.pop("operation_id") is not None
+            if item["completed_at"] is not None:
+                status = "used"
+            elif item["revoked_at"] is not None:
+                status = "replaced"
+            elif reserved and now <= item["expires_at"] + 86400:
+                status = "processing"
+            elif now > item["expires_at"]:
+                status = "expired"
+            else:
+                status = "available"
+            result.append({**item, "status": status})
+        return result
 
     def reserve_invitation(self, code: str, request_id: str, fingerprint: str):
         now = time.time()
@@ -165,6 +202,8 @@ class Registry:
             if not row:
                 raise RegistryError(400, "Código inválido o vencido")
             invite = dict(row)
+            if invite["revoked_at"] is not None:
+                raise RegistryError(400, "Código inválido o vencido")
             if invite["operation_id"]:
                 if invite["request_id"] != request_id or invite["fingerprint"] != fingerprint:
                     raise RegistryError(409, "Código ya utilizado")

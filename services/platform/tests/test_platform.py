@@ -70,7 +70,7 @@ def platform(tmp_path):
         if request.url.path == "/v1/devices":
             return httpx.Response(200, json={"devices": [{"id": "new-device-" + host, "device_name": "Test"}]})
         if request.url.path == "/internal/metrics":
-            return httpx.Response(200, json={"usage_bytes": 123, "quota_bytes": 5000, "health": "ready", "pending_ai_reports": 2, "report_details": "Synthetic private report", "message_id": "private-message"})
+            return httpx.Response(200, json={"usage_bytes": 123, "quota_bytes": 5000, "health": "ready", "pending_ai_reports": 2, "authorized_device_count": 3, "recent_device_count": 1, "devices": [{"id": "private-device"}], "report_details": "Synthetic private report", "message_id": "private-message"})
         if request.url.path == "/v1/chat/stream":
             return httpx.Response(200, headers={"content-type": "text/event-stream", "x-enrollment-key": "hidden"}, stream=ByteStream(b"event: delta\ndata: test\n\n"))
         if request.url.path == "/v1/documents/file":
@@ -530,3 +530,75 @@ def test_review_cli_exports_private_file_and_revokes_without_printing_code(revie
 def test_review_allowlist_requires_uuid():
     with pytest.raises(ValueError):
         Settings(review_space_id="not-a-space-id")
+
+
+async def test_admin_invitation_history_survives_replacement_and_activation(platform):
+    app, registry, personal, walter, _ = platform
+    from app.registry import RegistryError
+    first = registry.create_invitation(personal['id'], 'enroll', 60)
+    expired = registry.create_invitation(personal['id'], 'enroll', -1)
+    current = registry.create_invitation(personal['id'], 'reconnect', 60)
+    foreign = registry.create_invitation(walter['id'], 'enroll', 60)
+    with pytest.raises(RegistryError):
+        registry.reserve_invitation(first['code'], 'new-request', 'fingerprint')
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        path = '/control/v1/spaces/' + personal['id']
+        assert (await client.get(path)).status_code == 401
+        await login(client)
+        detail = (await client.get(path)).json()
+        history = {item['id']: item for item in detail['invitations']}
+        assert history[first['id']]['status'] == 'replaced'
+        assert history[expired['id']]['status'] == 'expired'
+        assert history[current['id']]['status'] == 'available'
+        assert foreign['id'] not in history
+        nonce = str(uuid.uuid4())
+        response, body = await activate(client, registry, personal, code=current['code'], request_id=nonce)
+        assert response.status_code == 200
+        detail_response = await client.get(path)
+        used = detail_response.json()['invitations'][0]
+        assert used['status'] == 'used' and used['completed_at'] is not None
+        for secret in (current['code'], first['code'], 'code_hash', 'fingerprint', 'access_token', 'refresh_token', 'replace_device_id'):
+            assert secret not in detail_response.text
+        assert (await client.post('/platform/v1/activate', json=body)).status_code == 200
+        assert len((await client.get(path)).json()['invitations']) == 3
+
+
+def test_invitation_migration_preserves_legacy_receipts_and_processing(tmp_path):
+    import sqlite3
+    from app.security import digest
+    path, key = str(tmp_path / 'old.sqlite3'), Fernet.generate_key()
+    registry = Registry(path, key)
+    space = registry.create_space('Synthetic', 'Owner')
+    registry.configure_space(space['id'], 'http://backend', 'owner', 's' * 40)
+    registry.set_space_state(space['id'], 'ready')
+    # Rebuild precisely the schema that existed before this change.
+    with sqlite3.connect(path) as db:
+        db.execute('DROP TABLE invitations')
+        db.execute('CREATE TABLE invitations (code_hash TEXT PRIMARY KEY, space_id TEXT, purpose TEXT, replace_device_id TEXT, expires_at REAL, operation_id TEXT UNIQUE, request_id TEXT, fingerprint TEXT, result TEXT, completed_at REAL)')
+        db.execute('INSERT INTO invitations VALUES(?,?,?,?,?,?,?,?,?,?)', (digest('legacy-code'), space['id'], 'enroll', None, time.time() + 60, None, None, None, None, None))
+    migrated = Registry(path, key)
+    item = migrated.list_invitations(space['id'])[0]
+    assert item['created_at'] is None and item['status'] == 'available'
+    assert Registry(path, key).list_invitations(space['id'])[0]['id'] == item['id']
+    invite = migrated.reserve_invitation('legacy-code', 'request', 'fp')
+    assert migrated.list_invitations(space['id'])[0]['status'] == 'processing'
+    migrated.create_invitation(space['id'], 'reconnect', 60)
+    migrated.finish_invitation(invite['code_hash'], {'access_token': 'private'})
+    assert migrated.reserve_invitation('legacy-code', 'request', 'fp')['result'] == {'access_token': 'private'}
+    assert migrated.list_invitations(space['id'])[1]['status'] == 'used'
+
+
+async def test_admin_device_counts_are_allowlisted_and_unavailable_is_not_zero(platform):
+    app, registry, personal, _, state = platform
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        await login(client)
+        path = '/control/v1/spaces/' + personal['id']
+        response = await client.get(path)
+        assert response.json()['authorized_device_count'] == 3
+        assert response.json()['recent_device_count'] == 1
+        assert state['requests'][-1].url.params['user_id'] == 'default_user'
+        assert 'private-device' not in response.text
+        registry.set_space_state(personal['id'], 'suspended')
+        suspended = (await client.get(path)).json()
+        assert suspended['authorized_device_count'] is None
+        assert suspended['recent_device_count'] is None

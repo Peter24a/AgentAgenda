@@ -193,6 +193,8 @@
   .metadata { display: grid; gap: 20px; grid-template-columns: repeat(3, 1fr); margin: 24px 0; }
   .metadata dt { color: var(--muted); font-size: 11px; margin-bottom: 5px; }
   .metadata dd { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
+  .invitation-reference { display: block; margin-top: 4px; }
+  .detail-grid + .panel { margin-top: 21px; }
   .detail-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 21px; }
   .detail-actions { margin-top: 22px; display: flex; gap: 9px; flex-wrap: wrap; }
   .operation { display: flex; gap: 12px; align-items: flex-start; padding: 16px 0; border-bottom: 1px solid var(--line); }

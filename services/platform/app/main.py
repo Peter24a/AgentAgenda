@@ -3,6 +3,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -20,10 +21,14 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from .config import Settings
 from .registry import Registry, RegistryError
 from .security import RateLimiter, digest, verify_password
+from .sara_auth import SaraAuth, IdentityRejected, IdentityUnavailable
 
 log = logging.getLogger("agentagenda.platform")
 ADMIN_COOKIE = "aa_admin"
 OWNER_COOKIE = "aa_owner"
+SARA_FLOW_COOKIE = "aa_sara_flow"
+SARA_DEVICE_COOKIE = "aa_sara_device"
+SARA_AUTH_PATH = "/control/v1/auth"
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 REQUEST_HEADERS = {
     "authorization", "accept", "content-type", "if-match", "if-none-match", "range",
@@ -61,11 +66,12 @@ class Activate(BaseModel):
     request_id: str | None = Field(default=None, min_length=16, max_length=128)
 
 
-def create_app(settings: Settings | None = None, registry: Registry | None = None, transport=None) -> FastAPI:
+def create_app(settings: Settings | None = None, registry: Registry | None = None, transport=None, identity_transport=None) -> FastAPI:
     cfg = settings or Settings()
     origin = cfg.validated_origin()
     reg = registry or Registry(cfg.registry_path, cfg.encryption_key())
-    admin_hash = cfg.password_hash()
+    sara = SaraAuth(cfg, reg, identity_transport) if cfg.identity_enabled else None
+    admin_hash = None if sara else cfg.password_hash()
     secure_cookie = origin.startswith("https://")
     client = httpx.AsyncClient(timeout=httpx.Timeout(60, connect=10, read=300), follow_redirects=False, transport=transport, trust_env=False)
     pending_tasks: set[asyncio.Task] = set()
@@ -136,11 +142,18 @@ def create_app(settings: Settings | None = None, registry: Registry | None = Non
         if pending_tasks:
             await asyncio.gather(*pending_tasks, return_exceptions=True)
         await client.aclose()
+        if sara:
+            await asyncio.to_thread(sara.client.close)
 
     app = FastAPI(title="AgentAgenda Platform", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=[h.strip() for h in cfg.trusted_hosts.split(",")])
     app.state.registry, app.state.settings = reg, cfg
     app.state.client = client
+    app.state.sara = sara
+
+    @app.exception_handler(IdentityUnavailable)
+    async def identity_unavailable(_request, _exc):
+        return JSONResponse({"detail": "SARA ID no está disponible; intenta de nuevo"}, status_code=503)
 
     @app.exception_handler(RegistryError)
     async def registry_error(_request, exc: RegistryError):
@@ -181,8 +194,9 @@ def create_app(settings: Settings | None = None, registry: Registry | None = Non
         if not supplied or not hmac.compare_digest(supplied.encode(), session["csrf"].encode()):
             raise HTTPException(403, "Sesión de formulario inválida")
 
-    def admin(request: Request):
-        session = reg.get_session(request.cookies.get(ADMIN_COOKIE), "admin")
+    async def admin(request: Request):
+        session = (await asyncio.to_thread(sara.authenticate, request.cookies.get(ADMIN_COOKIE))
+                   if sara else reg.get_session(request.cookies.get(ADMIN_COOKIE), "admin"))
         if request.method not in SAFE_METHODS:
             check_csrf(request, session)
         return session
@@ -195,12 +209,12 @@ def create_app(settings: Settings | None = None, registry: Registry | None = Non
             raise RegistryError(503, "Espacio no disponible")
         return space
 
-    async def backend_json(space, method: str, path: str, *, token: str | None = None, json_body=None, headers=None):
+    async def backend_json(space, method: str, path: str, *, token: str | None = None, json_body=None, headers=None, params=None):
         outgoing = dict(headers or {})
         if token:
             outgoing["Authorization"] = "Bearer " + token
         try:
-            response = await client.request(method, space["backend_url"] + path, headers=outgoing, json=json_body)
+            response = await client.request(method, space["backend_url"] + path, headers=outgoing, json=json_body, params=params)
         except httpx.HTTPError:
             raise HTTPException(503, "El espacio no está disponible; intenta de nuevo")
         if response.is_redirect:
@@ -246,8 +260,61 @@ def create_app(settings: Settings | None = None, registry: Registry | None = Non
     async def health():
         return {"status": "ok", "service": "agentagenda-platform"}
 
+    @app.get("/control/v1/auth/config")
+    async def admin_auth_config():
+        if sara:
+            return {"provider": "sara", "login_url": "/control/v1/auth/sara/start",
+                    "account_url": cfg.identity_portal_url.rstrip("/") + "/account"}
+        return {"provider": "local"}
+
+    @app.get("/control/v1/auth/sara/start")
+    async def sara_start(request: Request):
+        if not sara:
+            raise HTTPException(404, "Acceso SARA no configurado")
+        check_origin(request)
+        peer = request.client.host if request.client else "unknown"
+        if not login_limit.allow(peer):
+            raise HTTPException(429, "Demasiados intentos; espera unos minutos")
+        url, browser, device = await asyncio.to_thread(sara.start, request.cookies.get(ADMIN_COOKIE),
+            request.cookies.get(SARA_FLOW_COOKIE), request.cookies.get(SARA_DEVICE_COOKIE))
+        response = RedirectResponse(url, status_code=302)
+        response.set_cookie(SARA_FLOW_COOKIE, browser, httponly=True, secure=secure_cookie,
+                            samesite="lax", path=SARA_AUTH_PATH, max_age=600)
+        response.set_cookie(SARA_DEVICE_COOKIE, device, httponly=True, secure=secure_cookie,
+                            samesite="strict", path=SARA_AUTH_PATH, max_age=31536000)
+        return response
+
+    @app.get("/control/v1/auth/sara/callback")
+    async def sara_callback(request: Request):
+        if not sara:
+            raise HTTPException(404, "Acceso SARA no configurado")
+        query = request.query_params
+        # Uvicorn logs scope.query_string after the response; never journal OAuth codes/state.
+        request.scope["query_string"] = b""
+        error = None
+        try:
+            state, code = query.get("state", ""), query.get("code", "")
+            if (len(query.getlist("state")) != 1 or len(query.getlist("code")) != 1
+                    or not re.fullmatch(r"[A-Za-z0-9_-]{16,512}", state) or not 1 <= len(code) <= 2048):
+                raise RegistryError(400, "Intento inválido")
+            token, ttl = await asyncio.to_thread(sara.callback, state, request.cookies.get(SARA_FLOW_COOKIE), code)
+        except RegistryError:
+            error = "invalid_attempt"
+        except IdentityRejected:
+            error = "access_denied"
+        except IdentityUnavailable:
+            error = "unavailable"
+        response = RedirectResponse("/admin" + ("?auth_error=" + error if error else ""), status_code=303)
+        response.delete_cookie(SARA_FLOW_COOKIE, path=SARA_AUTH_PATH)
+        if not error:
+            response.set_cookie(ADMIN_COOKIE, token, httponly=True, secure=secure_cookie,
+                                samesite="strict", path="/control", max_age=ttl)
+        return response
+
     @app.post("/control/v1/auth/login")
     async def login(body: Login, request: Request, response: Response):
+        if sara:
+            raise HTTPException(404, "Usa SARA ID para entrar")
         check_origin(request)
         peer = request.client.host if request.client else "unknown"
         if not login_limit.allow(peer):
@@ -262,24 +329,31 @@ def create_app(settings: Settings | None = None, registry: Registry | None = Non
 
     @app.get("/control/v1/auth/me")
     async def admin_me(request: Request):
-        session = admin(request)
+        session = await admin(request)
         return {"username": session["value"]["username"], "csrf_token": session["csrf"]}
 
     @app.post("/control/v1/auth/logout")
     async def admin_logout(request: Request, response: Response):
-        admin(request)
-        reg.delete_session(request.cookies.get(ADMIN_COOKIE))
+        # Local logout remains possible during an Identity outage; never require introspection here.
+        session = reg.get_session(request.cookies.get(ADMIN_COOKIE), "admin")
+        check_csrf(request, session)
+        revoked = True
+        if sara:
+            revoked = await asyncio.to_thread(sara.logout, request.cookies.get(ADMIN_COOKIE), request.cookies.get(SARA_FLOW_COOKIE))
+        else:
+            reg.delete_session(request.cookies.get(ADMIN_COOKIE))
         response.delete_cookie(ADMIN_COOKIE, path="/control")
-        return {"ok": True}
+        response.delete_cookie(SARA_FLOW_COOKIE, path=SARA_AUTH_PATH)
+        return {"ok": True, "identity_revoked": revoked}
 
     @app.get("/control/v1/spaces")
     async def list_spaces(request: Request):
-        admin(request)
+        await admin(request)
         return {"spaces": reg.list_spaces()}
 
     @app.post("/control/v1/spaces", status_code=202)
     async def new_space(body: NewSpace, request: Request):
-        admin(request)
+        await admin(request)
         if not cfg.provisioner:
             raise HTTPException(503, "El aprovisionamiento no está configurado")
         name, owner_name = body.name.strip(), body.owner_name.strip()
@@ -291,15 +365,19 @@ def create_app(settings: Settings | None = None, registry: Registry | None = Non
 
     @app.get("/control/v1/spaces/{space_id}")
     async def space_detail(space_id: str, request: Request):
-        admin(request)
+        await admin(request)
         metadata = reg.get_space(space_id)
         metadata["health"] = metadata["state"]
         metadata["usage_bytes"] = None
         metadata["pending_ai_reports"] = None
+        metadata["invitations"] = reg.list_invitations(space_id)
+        metadata["authorized_device_count"] = None
+        metadata["recent_device_count"] = None
+        metadata["device_activity_window_minutes"] = 15
         if metadata["state"] == "ready":
             space = reg.get_space(space_id, include_secret=True)
             try:
-                metrics = await backend_json(space, "GET", "/internal/metrics", headers={"X-Enrollment-Key": space["enrollment_key"]})
+                metrics = await backend_json(space, "GET", "/internal/metrics", headers={"X-Enrollment-Key": space["enrollment_key"]}, params={"user_id": space["user_id"]})
                 usage = metrics.get("usage_bytes")
                 if isinstance(usage, int) and usage >= 0:
                     metadata["usage_bytes"] = usage
@@ -309,20 +387,24 @@ def create_app(settings: Settings | None = None, registry: Registry | None = Non
                 pending_reports = metrics.get("pending_ai_reports")
                 if isinstance(pending_reports, int) and not isinstance(pending_reports, bool) and pending_reports >= 0:
                     metadata["pending_ai_reports"] = pending_reports
+                for field in ("authorized_device_count", "recent_device_count"):
+                    value = metrics.get(field)
+                    if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                        metadata[field] = value
             except HTTPException:
                 metadata["health"] = "unavailable"
         return metadata
 
     @app.post("/control/v1/spaces/{space_id}/activation")
     async def invitation(space_id: str, body: Invitation, request: Request):
-        admin(request)
+        await admin(request)
         if body.replace_device_id and body.purpose != "reconnect":
             raise HTTPException(422, "El dispositivo anterior sólo aplica a reconexión")
         return reg.create_invitation(space_id, body.purpose, cfg.invitation_seconds, body.replace_device_id)
 
     @app.post("/control/v1/spaces/{space_id}/{action}", status_code=202)
     async def space_action(space_id: str, action: str, request: Request):
-        admin(request)
+        await admin(request)
         allowed = {"suspend": {"ready", "suspended"}, "resume": {"suspended"}, "close": {"ready", "suspended", "closed"}, "reopen": {"closed"}, "retry": {"failed"}}
         if action not in allowed:
             raise HTTPException(404, "Acción no encontrada")
@@ -339,12 +421,12 @@ def create_app(settings: Settings | None = None, registry: Registry | None = Non
 
     @app.get("/control/v1/operations")
     async def operations(request: Request):
-        admin(request)
+        await admin(request)
         return {"operations": reg.list_operations()}
 
     @app.get("/control/v1/operations/{operation_id}")
     async def operation_detail(operation_id: str, request: Request):
-        admin(request)
+        await admin(request)
         return reg.get_operation(operation_id)
 
     @app.post("/platform/v1/activate")

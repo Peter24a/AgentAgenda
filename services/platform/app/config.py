@@ -23,6 +23,27 @@ class Settings(BaseSettings):
     max_request_bytes: int = 104857600
     trusted_hosts: str = "agenda-api.pedroibarra.dev,localhost,127.0.0.1,testserver"
     review_space_id: str = ""
+    identity_enabled: bool = False
+    identity_api_url: str = ""
+    identity_portal_url: str = "https://auth.ici-labs.com"
+    identity_client_id: str = "agentagenda-admin-web"
+    identity_audience: str = "agentagenda-admin"
+    identity_admin_ids: str = ""
+
+    def admin_identity_ids(self) -> set[str]:
+        ids = {str(uuid.UUID(value.strip())) for value in self.identity_admin_ids.split(",") if value.strip()}
+        if self.identity_enabled:
+            if not ids:
+                raise ValueError("Configure explicit central UUIDs in PLATFORM_IDENTITY_ADMIN_IDS")
+            for url in (self.identity_api_url, self.identity_portal_url, self.public_base_url):
+                parsed = urlsplit(url)
+                if (not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment
+                        or parsed.path not in {"", "/"} or parsed.scheme not in {"http", "https"}
+                        or (parsed.scheme == "http" and parsed.hostname not in {"localhost", "127.0.0.1", "::1"})):
+                    raise ValueError("Identity endpoints require HTTPS or loopback HTTP origins")
+            if not self.identity_client_id or not self.identity_audience:
+                raise ValueError("Identity client and audience are required")
+        return ids
 
     @field_validator("review_space_id")
     @classmethod

@@ -153,3 +153,37 @@ async def test_expired_upload_reservation_is_released_and_excess_chunk_is_discar
         await store.append_chunk(replacement.upload_id, "alice", b"x" * 11)
     assert not (tmp_path / "temp" / (replacement.upload_id + ".part")).exists()
     assert store.start_upload_session("alice", UploadInitRequest(filename="new.txt", mime_type="text/plain", expected_size_bytes=10))
+
+
+@pytest.mark.asyncio
+async def test_internal_device_counts_scope_tokens_revocation_and_recent_use(client, db_session, enrollment):
+    now = datetime.utcnow()
+    for key, owner in [('recent', 'alice'), ('idle', 'alice'), ('expired', 'alice'), ('revoked', 'alice'), ('inactive', 'alice'), ('foreign', 'bob')]:
+        result = (await client.post('/internal/enroll', headers=enrollment, json={
+            'operation_id': key, 'user_id': owner, 'device_name': 'Private ' + key})).json()
+        device = await db_session.get(Device, result['device_id'])
+        device.last_seen_at = now - timedelta(minutes=20 if key == 'idle' else 1)
+        if key == 'inactive':
+            device.is_active = False
+        tokens = (await db_session.execute(select(AuthToken).where(AuthToken.device_id == device.id))).scalars().all()
+        for token in tokens:
+            if key == 'expired':
+                token.expires_at = now - timedelta(seconds=1)
+            if key == 'revoked':
+                token.revoked_at = now
+        if key == 'idle':
+            # A still-valid refresh token is sufficient to keep device access alive.
+            tokens[0].expires_at = now - timedelta(seconds=1)
+        await db_session.commit()
+    assert (await client.get('/internal/metrics', params={'user_id': 'alice'})).status_code == 403
+    response = await client.get('/internal/metrics', headers=enrollment, params={'user_id': 'alice'})
+    assert response.status_code == 200
+    assert response.json()['authorized_device_count'] == 2
+    assert response.json()['recent_device_count'] == 1
+    assert 'Private' not in response.text and 'device_name' not in response.text
+    other = (await client.get('/internal/metrics', headers=enrollment, params={'user_id': 'bob'})).json()
+    assert other['authorized_device_count'] == 1 and other['recent_device_count'] == 1
+    empty = (await client.get('/internal/metrics', headers=enrollment, params={'user_id': 'nobody'})).json()
+    assert empty['authorized_device_count'] == 0
+    legacy = (await client.get('/internal/metrics', headers=enrollment)).json()
+    assert legacy['authorized_device_count'] is None

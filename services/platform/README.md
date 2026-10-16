@@ -32,13 +32,65 @@ uvicorn app.server:app --host 127.0.0.1 --port 8080 --workers 1 --no-proxy-heade
 
 Admin login sets `aa_admin`, scoped to `/control`, HttpOnly/Secure/SameSite=Strict. Login/me return `csrf_token`; every admin mutation requires `X-CSRF-Token`. Owner activation with `platform=web` requires the public Origin, stores backend tokens encrypted server-side and sets the separate `aa_owner` cookie. Owner session response contains metadata and a CSRF token, with no backend credentials. Owner cookie mutations require the token and reject foreign origins. Login and activation are rate limited; run one process. Native activation returns device credentials for secure device storage, with base URL `/s/UUID`. Both clients should persist a random `request_id` before activation so lost-response retries recover the same encrypted result. A different nonce or changed device metadata cannot replay a consumed invitation.
 
-Owner web sessions renew backend tokens server-side and validate current identity before content access. `/platform/v1/devices` lists the owner's devices; `/platform/v1/activation` issues a code to add another device. Administrative APIs provide only names, states, quotas, the count of pending AI reports and operation records; they contain no agenda, conversations, report details, documents, browser owner cookies or backend tokens.
+Owner web sessions renew backend tokens server-side and validate current identity before content access. `/platform/v1/devices` lists the owner's devices; `/platform/v1/activation` issues a code to add another device. Space detail includes the last 100 single-use invitation records (available, processing, used, expired or replaced), with a public reference and timestamps; codes and hashes never appear in history. New invitations preserve and invalidate unused predecessors. Existing stored invitations receive stable references on startup; codes deleted by older releases cannot be recovered, and legacy creation dates remain unknown. Completed receipts and in-progress retries keep their original behavior.
+
+Space detail also exposes per-owner counts of devices with unrevoked, unexpired access or refresh credentials, and the subset seen in the last 15 minutes. These are distinct devices, not token counts or proof of simultaneous online presence. Offline/suspended backends report unknown counts rather than zero. The detail view refreshes every 15 seconds while no dialog is open. Backend metrics require the enrollment key and an explicit owner query for counts; older backend versions leave counts unavailable.
+
+Administrative APIs provide only names, states, quotas, aggregate device counts, invitation status, the count of pending AI reports and operation records; they contain no agenda, conversations, report details, documents, browser owner cookies or backend tokens.
 
 The gateway streams SSE and documents without buffering full responses or following redirects. Relative document URLs must be resolved against the current `/s/UUID` base by clients. Health only exposes readiness. Uploaded bodies are limited by `PLATFORM_MAX_REQUEST_BYTES` (100 MiB default); the provisioner supplies `STORAGE_QUOTA_BYTES` to the dedicated backend, which accounts for stored documents, active upload reservations and orphan partial files. Space detail reports actual usage and the effective quota through a protected metrics endpoint. Existing stored content is not re-encrypted by this registry: encrypted block storage and encrypted backups are deployment responsibilities.
 
 Provisioner stdout/stderr is retained privately in an `operations` directory beside the registry, with directory mode 0700 and log mode 0600. Administrative responses contain only a generic failure message and operation ID. No helper logs are exposed through HTTP.
 
 Cookie sessions last one day by default (`PLATFORM_SESSION_SECONDS`); invitations last one day (`PLATFORM_INVITATION_SECONDS`). The registry retains consumed activation receipts for retry for up to one day after invitation expiry. Treat codes as credentials and deliver them through a trusted channel. The operator CLI emits invitations only on explicit execution.
+
+## Administración con SARA ID
+
+En producción el panel usa Authorization Code + PKCE con el portal SARA. La sesión
+central se revalida mediante `/auth/introspect` en cada petición administrativa,
+con cliente y audiencia fijados por el servidor. El permiso de administrar se
+asigna mediante una lista explícita de UUID centrales; no se deriva del correo,
+rol global ni orden de registro. Los espacios y la activación de sus propietarios
+conservan su identidad y sus datos.
+
+Configuración del servicio (fuera de Git):
+
+- `PLATFORM_IDENTITY_ENABLED=true`.
+- `PLATFORM_IDENTITY_API_URL`: origen de la API; admite HTTP solo en loopback.
+- `PLATFORM_IDENTITY_PORTAL_URL=https://auth.ici-labs.com`.
+- `PLATFORM_IDENTITY_CLIENT_ID=agentagenda-admin-web`.
+- `PLATFORM_IDENTITY_AUDIENCE=agentagenda-admin`.
+- `PLATFORM_IDENTITY_ADMIN_IDS`: UUID centrales autorizados, separados por comas.
+
+Registrar en Identity el cliente, su audiencia y el callback exacto
+`https://agenda-api.pedroibarra.dev/control/v1/auth/sara/callback`, conservando los
+clientes existentes. Añadirlo a la lista de clientes de confianza permite
+reutilizar la sesión SARA. El contrato canónico reside en
+`ici-identity/docs/CLIENT_INTEGRATION.md`; no es un flujo OpenID Connect.
+
+`GET /control/v1/auth/config` indica el proveedor al navegador. Cuando SARA está
+habilitado, la contraseña administrativa local y las sesiones locales previas
+no autorizan acceso. El modo local se conserva únicamente para instalaciones que
+lo configuren expresamente. La aplicación rechaza iniciar con SARA habilitado sin
+una lista de UUID autorizados o con orígenes inseguros.
+
+Los intentos duran diez minutos, están ligados al navegador y se consumen antes
+del canje. Access y refresh quedan cifrados en el registro existente; el navegador
+recibe una cookie opaca HttpOnly, Secure y SameSite=Strict. La cookie transitoria
+de OAuth es SameSite=Lax. El callback elimina su query del scope antes de que
+Uvicorn registre el acceso para evitar códigos en el journal.
+
+La renovación y el cierre se serializan mediante un bloqueo de archivo por
+registro en este host. Una respuesta de renovación ambigua exige iniciar de
+nuevo; no se repite automáticamente. Si SARA está caído, las consultas se rechazan
+con un error temporal. Cerrar sesión revoca el acceso local aunque falle la
+revocación central, y la interfaz informa ese límite. «Mi cuenta SARA» abre el
+portal compartido; cerrar AgentAgenda no cierra todos los demás productos.
+
+Los respaldos existentes del registro y de su clave conservan intentos y sesiones
+cifradas. Una reversión al código anterior debe retirar las sesiones
+administrativas y los códigos reemplazados que ese código no sabría invalidar;
+no restaura bases de contenido ni altera sesiones de propietarios.
 
 ## Google Play review access
 

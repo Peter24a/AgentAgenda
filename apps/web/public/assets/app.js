@@ -2,7 +2,7 @@ import {TIMEZONE, canonicalDate, localDay, spaceBase, documentLink, splitSse, fo
 
 const root = document.querySelector('#root');
 const notifications = document.querySelector('#notifications');
-const state = {admin: null, session: null, spaces: [], operations: [], screen: 'spaces', privateTab: 'agenda', timezone: TIMEZONE, startDate: localDay(), endDate: localDay(), epoch: 0, timer: null, stream: null};
+const state = {admin: null, adminAuthConfig: null, adminAuthError: '', session: null, spaces: [], operations: [], screen: 'spaces', privateTab: 'agenda', timezone: TIMEZONE, startDate: localDay(), endDate: localDay(), epoch: 0, timer: null, stream: null};
 const icons = {
   arrow: ['M5 12h14', 'm13 6 6 6-6 6'], back: ['M19 12H5', 'm11 6-6 6 6 6'], download: ['M12 3v12', 'm7 10 5 5 5-5', 'M5 16v5h14v-5'],
   calendar: ['M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z', 'M7 3v4M17 3v4M3 11h18'],
@@ -47,8 +47,8 @@ function field(label, name, options = {}) {
   return el('div', {class: `field${options.full ? ' span-full' : ''}`}, el('label', {for: input.id}, label), input, options.hint && el('small', {}, options.hint));
 }
 function statusBadge(value) {
-  const labels = {ready: 'Activo', active: 'Activo', suspended: 'Suspendido', closed: 'Cerrado', closing: 'Cerrando', provisioning: 'Preparando', pending: 'Pendiente', queued: 'En espera', running: 'En curso', completed: 'Completado', succeeded: 'Completado', failed: 'Falló', healthy: 'Disponible', degraded: 'Degradado', online: 'En línea', offline: 'Sin conexión', accepted: 'Aceptada', rejected: 'Rechazada'};
-  const css = ['closed', 'failed', 'offline'].includes(value) ? 'danger' : ['suspended', 'provisioning', 'pending', 'queued', 'degraded', 'running', 'closing'].includes(value) ? 'warning' : ['ready', 'active', 'healthy', 'online', 'completed', 'succeeded', 'accepted'].includes(value) ? '' : 'neutral';
+  const labels = {ready: 'Activo', active: 'Activo', suspended: 'Suspendido', closed: 'Cerrado', closing: 'Cerrando', provisioning: 'Preparando', pending: 'Pendiente', queued: 'En espera', running: 'En curso', completed: 'Completado', succeeded: 'Completado', failed: 'Falló', healthy: 'Disponible', degraded: 'Degradado', online: 'En línea', offline: 'Sin conexión', accepted: 'Aceptada', rejected: 'Rechazada', available: 'Disponible', used: 'Usado', expired: 'Vencido', replaced: 'Reemplazado', processing: 'Activación en curso'};
+  const css = ['closed', 'failed', 'offline', 'expired', 'replaced'].includes(value) ? 'danger' : ['suspended', 'provisioning', 'pending', 'queued', 'degraded', 'running', 'closing', 'processing'].includes(value) ? 'warning' : ['ready', 'active', 'healthy', 'online', 'completed', 'succeeded', 'accepted', 'available', 'used'].includes(value) ? '' : 'neutral';
   return el('span', {class: `badge ${css}`}, labels[value] || value || 'Sin estado');
 }
 function dateObject(value) { return canonicalDate(value); }
@@ -107,15 +107,45 @@ function showActivation() {
   authLayout({eyebrow: 'BIENVENIDO A TU ESPACIO', title: 'Lo tuyo, siempre contigo.', copy: 'Activa este navegador para abrir tu agenda. Si reinstalaste la app, tu código de reconexión te devuelve al mismo espacio y a su contenido guardado.', activation: true, card: el('section', {class: 'panel auth-card'}, el('h2', {}, 'Conectar mi espacio'), el('p', {}, 'Un código. Tu agenda de siempre.'), form, el('p', {class: 'auth-footnote'}, 'El código es temporal y de un solo uso. Si venció o ya se utilizó, pide uno nuevo al administrador.'))});
 }
 
-function showAdminLogin(errorText = '') {
+function consumeAdminAuthError() {
+  const url = new URL(location.href);
+  if (!url.searchParams.has('auth_error')) return '';
+  const code = url.searchParams.get('auth_error');
+  url.searchParams.delete('auth_error');
+  history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  return {access_denied: 'Tu cuenta SARA no tiene acceso a esta administración.', unavailable: 'SARA ID no está disponible por el momento. Inténtalo de nuevo.', invalid_attempt: 'No se pudo completar el acceso. Inicia sesión de nuevo con SARA ID.'}[code] || 'No se pudo completar el acceso con SARA ID. Inténtalo de nuevo.';
+}
+
+async function loadAdminAuthConfig() {
+  state.adminAuthConfig = null;
+  const config = await control('/auth/config');
+  if (config?.provider === 'local') { state.adminAuthConfig = config; return; }
+  if (config?.provider === 'sara' && typeof config.login_url === 'string' && typeof config.account_url === 'string') {
+    try {
+      const login = new URL(config.login_url, location.origin);
+      const account = new URL(config.account_url);
+      if (login.origin === location.origin && account.protocol === 'https:') { state.adminAuthConfig = config; return; }
+    } catch {}
+  }
+  throw new Error('No se pudo obtener la configuración de acceso. Inténtalo de nuevo.');
+}
+
+function showAdminLogin(errorText = '', statusText = '') {
   startScreen(); document.title = 'Acceso administrativo · AgentAgenda';
+  const config = state.adminAuthConfig;
+  if (config?.provider !== 'local') {
+    const available = config?.provider === 'sara';
+    const card = el('section', {class: 'panel auth-card'}, el('h2', {}, 'Acceso administrativo'), el('p', {}, available ? 'Entra con la misma cuenta SARA que ya utilizas en tus otros servicios.' : 'La configuración de acceso no está disponible.'), el('div', {class: 'stack'}, errorText && notice(errorText, 'error'), statusText && notice(statusText, 'warning'), available ? link('Continuar con SARA ID', config.login_url, 'button', 'arrow') : button('Intentar de nuevo', bootstrap, 'secondary', 'refresh'), available && link('Mi cuenta SARA', config.account_url, 'nav-link')), el('p', {class: 'auth-footnote'}, 'Para abrir tu agenda personal, ', link('conecta tu espacio', '/activar'), '.'));
+    authLayout({eyebrow: 'ADMINISTRACIÓN', title: 'Administración de espacios.', copy: 'Crea espacios para tus clientes, genera códigos de acceso y administra el estado del servicio.', card});
+    return;
+  }
   const form = el('form', {class: 'stack'}, el('div', {class: 'form-error'}, errorText && notice(errorText, 'error')), field('Usuario', 'username', {required: true, autocomplete: 'username', maxlength: 128}), field('Contraseña', 'password', {type: 'password', required: true, autocomplete: 'current-password', maxlength: 1024}), el('button', {type: 'submit', class: 'button'}, 'Entrar a administración', icon('arrow')));
   form.addEventListener('submit', async event => {
     event.preventDefault(); const submit = form.querySelector('[type=submit]'); submit.disabled = true; form.querySelector('.form-error').replaceChildren(); const data = new FormData(form);
     try { state.admin = await control('/auth/login', {method: 'POST', body: {username: data.get('username'), password: data.get('password')}}); form.reset(); showAdmin(); }
     catch (error) { formError(form, error); } finally { submit.disabled = false; }
   });
-  authLayout({eyebrow: 'ADMINISTRACIÓN', title: 'Administración de espacios.', copy: 'Crea espacios para tus clientes, genera códigos de acceso y administra el estado del servicio.', card: el('section', {class: 'panel auth-card'}, el('h2', {}, 'Acceso administrativo'), el('p', {}, 'Usa tus credenciales de administrador.'), form, el('p', {class: 'auth-footnote'}, 'Para abrir tu agenda personal, ', link('conecta tu espacio', '/activar'), '.'))});
+  authLayout({eyebrow: 'ADMINISTRACIÓN', title: 'Administración de espacios.', copy: 'Crea espacios para tus clientes, genera códigos de acceso y administra el estado del servicio.', card: el('section', {class: 'panel auth-card'}, el('h2', {}, 'Acceso administrativo'), el('p', {}, 'Usa tus credenciales de administrador.'), statusText && notice(statusText, 'warning'), form, el('p', {class: 'auth-footnote'}, 'Para abrir tu agenda personal, ', link('conecta tu espacio', '/activar'), '.'))});
 }
 
 function shell(mode, active, contentNode) {
@@ -123,10 +153,11 @@ function shell(mode, active, contentNode) {
   const displayName = admin ? state.admin.username : state.session.space_name;
   const nav = el('nav', {class: 'side-nav', 'aria-label': admin ? 'Administración' : 'Mi espacio'}, items.map(([name, glyph, label]) => el('button', {type: 'button', class: name === active ? 'active' : '', 'aria-current': name === active ? 'page' : null, onclick: () => admin ? showAdmin(name) : showPrivate(name)}, icon(glyph), label)));
   const logout = button('Salir', async event => {
-    await busy(event.currentTarget, async () => { await api(admin ? '/control/v1/auth/logout' : '/platform/v1/logout', {method: 'POST', scope: admin ? 'admin' : 'owner'}); if (admin) { state.admin = null; showAdminLogin(); } else { state.session = null; history.replaceState(null, '', '/activar'); showActivation(); } });
+    await busy(event.currentTarget, async () => { const result = await api(admin ? '/control/v1/auth/logout' : '/platform/v1/logout', {method: 'POST', scope: admin ? 'admin' : 'owner'}); if (admin) { state.admin = null; showAdminLogin('', result?.identity_revoked === false ? 'La sesión de AgentAgenda se cerró. No se pudo revocar el acceso en SARA ID; puedes revisarlo en Mi cuenta SARA.' : ''); } else { state.session = null; history.replaceState(null, '', '/activar'); showActivation(); } });
   }, 'ghost small logout', 'logout');
   const side = el('aside', {class: 'sidebar'}, brand(admin ? '/' : '/app'), el('p', {class: 'eyebrow sidebar-label'}, admin ? 'CONTROL DEL SERVICIO' : 'MI ESPACIO'), nav, el('div', {class: 'sidebar-bottom'}, el('div', {class: 'identity'}, el('div', {class: 'avatar'}, displayName.slice(0, 2).toUpperCase()), el('div', {class: 'identity-text'}, el('strong', {}, displayName), el('small', {}, admin ? 'Administrador' : 'Espacio personal'))), logout));
-  root.replaceChildren(el('div', {class: 'app-layout'}, side, el('main', {id: 'main', class: 'app-content'}, el('div', {class: 'topbar'}, el('span', {}, admin ? 'Administración / AgentAgenda' : `Mi espacio / ${displayName}`), el('span', {class: 'connection'}, 'Sesión autenticada')), contentNode, el('footer', {class: 'app-footer'}, helpLinks()))));
+  const sessionLinks = el('div', {class: 'flex wrap'}, admin && state.adminAuthConfig?.provider === 'sara' && link('Mi cuenta SARA', state.adminAuthConfig.account_url, 'nav-link'), el('span', {class: 'connection'}, 'Sesión autenticada'));
+  root.replaceChildren(el('div', {class: 'app-layout'}, side, el('main', {id: 'main', class: 'app-content'}, el('div', {class: 'topbar'}, el('span', {}, admin ? 'Administración / AgentAgenda' : `Mi espacio / ${displayName}`), sessionLinks), contentNode, el('footer', {class: 'app-footer'}, helpLinks()))));
 }
 
 async function showAdmin(screen = 'spaces', spaceId = null) {
@@ -137,9 +168,9 @@ async function showAdmin(screen = 'spaces', spaceId = null) {
     else if (screen === 'operations') { const result = await control('/operations'); if (epoch !== state.epoch) return; state.operations = result.operations || []; renderOperations(area); }
     else { const [space, result] = await Promise.all([control(`/spaces/${encodeURIComponent(spaceId)}`), control('/operations')]); if (epoch !== state.epoch) return; renderSpaceDetail(area, space, (result.operations || []).filter(operation => operation.space_id === space.id)); }
     const running = screen === 'spaces' ? state.spaces.some(space => ['provisioning', 'closing'].includes(space.state)) : screen === 'operations' ? state.operations.some(operation => ['queued', 'running', 'pending'].includes(operation.state)) : Boolean(area.querySelector('[data-poll]'));
-    if (running) {
+    if (running || screen === 'detail') {
       const refresh = () => { if (epoch !== state.epoch) return; if (document.querySelector('dialog')) { state.timer = setTimeout(refresh, 4000); return; } showAdmin(screen, spaceId); };
-      state.timer = setTimeout(refresh, 4000);
+      state.timer = setTimeout(refresh, running ? 4000 : 15000);
     }
   } catch (error) { if (epoch !== state.epoch) return; if (error.status === 401) { state.admin = null; showAdminLogin(); } else displayError(area, error, () => showAdmin(screen, spaceId)); }
 }
@@ -166,10 +197,25 @@ function renderSpaceDetail(area, space, operations) {
   else if (space.state === 'suspended') lifecycle.append(button('Reactivar', () => confirmLifecycle(space, 'resume'), '', 'refresh'), button('Cerrar espacio', () => confirmLifecycle(space, 'close'), 'ghost'));
   else if (space.state === 'closed') lifecycle.append(button('Reabrir espacio', () => confirmLifecycle(space, 'reopen'), 'secondary', 'refresh'));
   else if (space.state === 'failed') lifecycle.append(button('Reintentar preparación', () => confirmLifecycle(space, 'retry'), 'secondary', 'refresh'));
-  const access = el('div', {}, el('p', {class: 'muted'}, 'Entrega un código temporal para activar un dispositivo nuevo o recuperar acceso al mismo espacio.'), el('div', {class: 'detail-actions'}, button('Activar dispositivo', () => createActivation(space, 'enroll'), '', 'plus'), button('Código de reconexión', () => createActivation(space, 'reconnect'), 'secondary', 'refresh')), notice('Verifica la identidad del propietario antes de entregar un código de reconexión.'), el('p', {class: 'retention'}, 'Los códigos no aparecen en listados y se muestran sólo al generarlos.'));
+  const access = el('div', {}, el('p', {class: 'muted'}, 'Entrega un código temporal para activar un dispositivo nuevo o recuperar acceso al mismo espacio.'), el('div', {class: 'detail-actions'}, button('Activar dispositivo', () => createActivation(space, 'enroll'), '', 'plus'), button('Código de reconexión', () => createActivation(space, 'reconnect'), 'secondary', 'refresh')), notice('Verifica la identidad del propietario antes de entregar un código de reconexión.'), el('p', {class: 'retention'}, 'El código completo se muestra sólo al generarlo. Su estado queda en el historial; generar otro reemplaza el anterior que siga disponible.'));
   access.querySelectorAll('button').forEach(node => { node.disabled = space.state !== 'ready'; });
-  const statePanel = el('div', {}, metadata([['Propietario', space.owner_name], ['Estado', statusBadge(space.state)], ['Salud del servicio', statusBadge(space.health === 'ready' ? 'healthy' : space.health === 'unavailable' ? 'offline' : space.health || 'Sin medición')], ['Reportes de IA por atender', Number.isInteger(space.pending_ai_reports) ? String(space.pending_ai_reports) : 'Sin medición'], ['Archivos almacenados', formatBytes(space.usage_bytes)], ['Límite efectivo de archivos', formatBytes(quota)], ['Creado', dateTime(space.created_at)], ['Última actualización', dateTime(space.updated_at)], ['Identificador', space.id]]), consumption, lifecycle, el('p', {class: 'retention'}, 'Suspender bloquea el servicio y conserva los datos. Cerrar también bloquea el acceso y conserva sus recursos para una posible reapertura.'));
-  area.replaceChildren(button('Todos los espacios', () => showAdmin(), 'ghost small back-button', 'back'), pageHeader('ESPACIO PERSONAL', space.name, 'Administración del acceso y los recursos del servicio.'), el('div', {class: 'detail-grid'}, panel('Estado del espacio', statePanel), panel('Acceso del propietario', access)), el('div', {class: 'stack'}, el('div', {}, ''), panel('Operaciones', operations.length ? el('div', {'data-poll': running ? '' : null}, operations.map(operationNode)) : empty('Sin operaciones registradas', 'Los cambios en este espacio aparecerán aquí.', 'activity'))));
+  const statePanel = el('div', {}, metadata([['Propietario', space.owner_name], ['Estado', statusBadge(space.state)], ['Salud del servicio', statusBadge(space.health === 'ready' ? 'healthy' : space.health === 'unavailable' ? 'offline' : space.health || 'Sin medición')], ['Dispositivos con acceso vigente', Number.isInteger(space.authorized_device_count) ? String(space.authorized_device_count) : 'Sin medición'], ['Con actividad en los últimos 15 minutos', Number.isInteger(space.recent_device_count) ? String(space.recent_device_count) : 'Sin medición'], ['Reportes de IA por atender', Number.isInteger(space.pending_ai_reports) ? String(space.pending_ai_reports) : 'Sin medición'], ['Archivos almacenados', formatBytes(space.usage_bytes)], ['Límite efectivo de archivos', formatBytes(quota)], ['Creado', dateTime(space.created_at)], ['Última actualización', dateTime(space.updated_at)], ['Identificador', space.id]]), el('p', {class: 'muted'}, 'El conteo incluye app y navegador con acceso vigente. La actividad reciente indica uso en los últimos 15 minutos; no confirma conexión en este instante.'), consumption, lifecycle, el('p', {class: 'retention'}, 'Suspender bloquea el servicio y conserva los datos. Cerrar también bloquea el acceso y conserva sus recursos para una posible reapertura.'));
+  area.replaceChildren(button('Todos los espacios', () => showAdmin(), 'ghost small back-button', 'back'), pageHeader('ESPACIO PERSONAL', space.name, 'Administración del acceso y los recursos del servicio.', button('Actualizar', () => showAdmin('detail', space.id), 'secondary', 'refresh')), el('div', {class: 'detail-grid'}, panel('Estado del espacio', statePanel), panel('Acceso del propietario', access)), invitationHistory(space.invitations || []), el('div', {class: 'stack'}, el('div', {}, ''), panel('Operaciones', operations.length ? el('div', {'data-poll': running ? '' : null}, operations.map(operationNode)) : empty('Sin operaciones registradas', 'Los cambios en este espacio aparecerán aquí.', 'activity'))));
+}
+
+
+function invitationHistory(invitations) {
+  const rows = invitations.map(invitation => el('tr', {},
+    el('td', {}, invitation.purpose === 'reconnect' ? 'Reconexión' : 'Activación', el('small', {class: 'muted invitation-reference', title: invitation.id}, `Referencia: ${invitation.id.slice(0, 8)}`)),
+    el('td', {}, statusBadge(invitation.status)),
+    el('td', {}, dateTime(invitation.created_at)),
+    el('td', {}, dateTime(invitation.expires_at)),
+    el('td', {}, dateTime(invitation.completed_at))));
+  return panel('Historial de códigos', el('div', {class: 'stack'},
+    el('p', {class: 'muted'}, 'Últimos 100 códigos de un solo uso. Se actualiza cada 15 segundos. «Usado» confirma que terminó la activación; «Activación en curso» indica un intento reservado que todavía puede reintentarse.'),
+    rows.length ? el('div', {class: 'table-wrap'}, el('table', {},
+      el('thead', {}, el('tr', {}, ['Tipo / referencia', 'Estado', 'Generado', 'Vencimiento', 'Usado'].map(title => el('th', {scope: 'col'}, title)))),
+      el('tbody', {}, rows))) : el('p', {class: 'muted'}, 'Todavía no hay códigos registrados.')));
 }
 
 function dialog(title, body) {
@@ -192,6 +238,7 @@ function confirmLifecycle(space, action) {
 }
 async function createActivation(space, purpose) {
   const body = el('div', {}, loading('Generando código…')); const modal = dialog(purpose === 'reconnect' ? 'Reconectar al mismo espacio' : 'Activar un dispositivo', body);
+  modal.addEventListener('close', () => { if (state.screen === 'detail') showAdmin('detail', space.id); }, {once: true});
   try { const result = await control(`/spaces/${encodeURIComponent(space.id)}/activation`, {method: 'POST', body: {purpose}}); if (!modal.open) return; renderCode(body, result, space.name, purpose); }
   catch (error) { if (modal.open) displayError(body, error); }
 }
@@ -404,8 +451,11 @@ function confirmRevokeDevice(device, current) {
 async function bootstrap() {
   if (location.pathname === '/activar') { showActivation(); return; }
   if (location.pathname === '/' || location.pathname === '/admin') {
+    state.adminAuthError = consumeAdminAuthError() || state.adminAuthError;
     root.replaceChildren(adminHeader(), el('main', {id: 'main'}, loading('Comprobando sesión administrativa…')));
-    try { state.admin = await control('/auth/me'); showAdmin(); } catch (error) { showAdminLogin(error.status === 401 ? '' : error.message); } return;
+    try { await loadAdminAuthConfig(); } catch (error) { showAdminLogin(error.message); return; }
+    const authError = state.adminAuthError; state.adminAuthError = '';
+    try { state.admin = await control('/auth/me'); showAdmin(); if (authError) toast(authError, true); } catch (error) { showAdminLogin(authError || (error.status === 401 ? '' : error.message)); } return;
   }
   if (location.pathname === '/app') {
     root.replaceChildren(publicHeader(), el('main', {id: 'main'}, loading('Conectando tu espacio…')));

@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime, timedelta
 
 from cryptography.fernet import Fernet
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db_session
 from app.config import settings
 from app.models.auth import PairRequest, PairResponse
-from app.models.canonical import Device, Document, DocumentOrigin, DocumentRevision, DocumentContextGrant, EnrollmentReceipt
+from app.models.canonical import AuthToken, Device, Document, DocumentOrigin, DocumentRevision, DocumentContextGrant, EnrollmentReceipt
 from app.services.auth_service import auth_service
 
 router = APIRouter(prefix="/internal", include_in_schema=False)
@@ -88,7 +88,7 @@ async def internal_enroll(req: EnrollmentRequest, session: AsyncSession = Depend
 
 
 @router.get("/metrics")
-async def metrics(x_enrollment_key: str | None = Header(default=None), session: AsyncSession = Depends(get_db_session)):
+async def metrics(x_enrollment_key: str | None = Header(default=None), session: AsyncSession = Depends(get_db_session), user_id: str | None = Query(default=None, min_length=1, max_length=64)):
     secret = settings.platform_enrollment_key.get_secret_value()
     if not secret or not x_enrollment_key or not hmac.compare_digest(secret.encode(), x_enrollment_key.encode()):
         raise HTTPException(403, "Acceso interno denegado")
@@ -96,4 +96,17 @@ async def metrics(x_enrollment_key: str | None = Header(default=None), session: 
     from app.models.canonical import ChatResponseReport
     usage = await asyncio.to_thread(document_storage.storage_usage_bytes)
     pending_reports = await session.scalar(select(func.count(ChatResponseReport.id)).where(ChatResponseReport.status == "received"))
-    return {"usage_bytes": usage, "quota_bytes": settings.storage_quota_bytes, "health": "ready", "pending_ai_reports": pending_reports or 0}
+    counts = {"authorized_device_count": None, "recent_device_count": None}
+    if user_id is not None:
+        now = datetime.utcnow()
+        # Count devices once even when refresh rotation leaves multiple token rows.
+        valid_token = select(AuthToken.id).where(
+            AuthToken.device_id == Device.id, AuthToken.user_id == user_id,
+            AuthToken.revoked_at.is_(None), AuthToken.expires_at > now,
+        ).exists()
+        devices = select(func.count(Device.id)).where(
+            Device.user_id == user_id, Device.is_active.is_(True), valid_token)
+        counts["authorized_device_count"] = await session.scalar(devices) or 0
+        counts["recent_device_count"] = await session.scalar(devices.where(
+            Device.last_seen_at >= now - timedelta(minutes=15), Device.last_seen_at <= now)) or 0
+    return {"usage_bytes": usage, "quota_bytes": settings.storage_quota_bytes, "health": "ready", "pending_ai_reports": pending_reports or 0, **counts}
