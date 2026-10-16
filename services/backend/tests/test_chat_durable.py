@@ -216,3 +216,59 @@ async def test_llm_failure_is_failed_turn_without_assistant_message(client, auth
         assert turn['status'] == 'failed'
         assert turn['assistant_message'] is None
         assert turn['error_message'] == 'Servicio no disponible'
+
+
+@pytest.mark.asyncio
+async def test_recovered_and_replayed_chat_proposal_remains_confirmable(client, auth_headers, db_session):
+    import json
+    from app.services.chat_orchestrator import ChatOrchestrator
+    with patch('app.services.chat_orchestrator.stream_chat_completion', side_effect=mock_stream_chat_completion):
+        payload = {'message': 'Agenda una reunión', 'client_message_id': 'recover-confirmable', 'timezone': 'America/Mexico_City'}
+        created = (await client.post('/v1/chat/turns', json=payload, headers=auth_headers)).json()
+        turn_id = created['turn_id']
+        stream = await client.get(f'/v1/chat/turns/{turn_id}/stream', headers=auth_headers)
+        events = [json.loads(line[6:]) for line in stream.text.splitlines() if line.startswith('data: ')]
+        streamed = next(item['proposal'] for item in events if item['type'] == 'proposal')
+        first = (await client.get(f'/v1/chat/turns/{turn_id}', headers=auth_headers)).json()
+        second = (await client.get(f'/v1/chat/turns/{turn_id}', headers=auth_headers)).json()
+        duplicate = (await client.post('/v1/chat/turns', json=payload, headers=auth_headers)).json()
+        restarted = await ChatOrchestrator().get_turn_response(db_session, first['user_id'], turn_id)
+        assert first['proposal'] == second['proposal'] == duplicate['proposal'] == streamed
+        assert restarted.proposal.id == streamed['id']
+        replay = await client.get(f'/v1/chat/turns/{turn_id}/stream', headers=auth_headers)
+        replay_events = [json.loads(line[6:]) for line in replay.text.splitlines() if line.startswith('data: ')]
+        assert next(item['proposal'] for item in replay_events if item['type'] == 'proposal')['id'] == streamed['id']
+        confirmed = await client.post('/v1/proposals/'+streamed['id']+'/confirm', headers=auth_headers)
+        assert confirmed.status_code == 200 and confirmed.json()['success']
+        recovered = (await client.get(f'/v1/chat/turns/{turn_id}', headers=auth_headers)).json()
+        assert recovered['proposal']['status'] == 'accepted'
+        assert recovered['proposal']['id'] == streamed['id']
+        agenda = (await client.get('/v1/agenda/events?date=2026-09-15', headers=auth_headers)).json()
+        assert len([item for item in agenda if item['id'] == 'evt-mock-01']) == 1
+        assert next(item for item in agenda if item['id'] == 'evt-mock-01')['start_time'].startswith('2026-09-15T21:00:00')
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('candidate_count', [0, 1, 2])
+async def test_legacy_turn_recovers_only_unambiguous_persisted_proposal(client, auth_headers, db_session, candidate_count):
+    import json
+    from datetime import datetime, timedelta
+    from app.models.canonical import Proposal
+    owner = (await client.get('/v1/auth/me', headers=auth_headers)).json()['user_id']
+    now = datetime.utcnow()
+    raw_item = {'id': 'legacy-event', 'title': 'Legacy meeting', 'start_time': '2026-10-20T14:00:00', 'end_time': '2026-10-20T15:00:00', 'category': 'work'}
+    content = '```proposal\n'+json.dumps({'summary': 'Legacy', 'reason': 'Test', 'items': [raw_item]})+'\n```'
+    turn_id = 'legacy-turn'
+    db_session.add(ChatTurn(id=turn_id, user_id=owner, status='completed', created_at=now-timedelta(seconds=2), completed_at=now))
+    await db_session.flush()
+    db_session.add(ChatMessage(id='legacy-message', turn_id=turn_id, user_id=owner, role='assistant', content=content, created_at=now, received_at=now))
+    for index in range(candidate_count):
+        db_session.add(Proposal(id=f'legacy-persisted-{index}', user_id=owner, summary='Legacy', reason='Test', resulting_items=[{**raw_item, 'start_time': '2026-10-20T14:00:00-06:00', 'end_time': '2026-10-20T15:00:00-06:00'}], status='pending', created_at=now-timedelta(seconds=1), updated_at=now))
+    await db_session.commit()
+    response = (await client.get(f'/v1/chat/turns/{turn_id}', headers=auth_headers)).json()
+    if candidate_count == 1:
+        assert response['proposal']['id'] == 'legacy-persisted-0'
+        confirmed = await client.post('/v1/proposals/legacy-persisted-0/confirm', headers=auth_headers)
+        assert confirmed.status_code == 200 and confirmed.json()['success']
+    else:
+        assert response['proposal'] is None

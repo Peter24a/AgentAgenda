@@ -146,7 +146,13 @@ async def test_internal_metrics_expose_report_count_only(client, db_session, mon
     result = await client.get("/internal/metrics", headers={"X-Enrollment-Key": "synthetic-internal-key"})
     assert result.status_code == 200
     assert result.json()["pending_ai_reports"] == 1
-    assert set(result.json()) == {"usage_bytes", "quota_bytes", "health", "pending_ai_reports"}
+    assert set(result.json()) == {
+        "usage_bytes", "quota_bytes", "health", "pending_ai_reports",
+        "authorized_device_count", "recent_device_count",
+    }
+    # Without an explicitly selected owner, no device count is disclosed.
+    assert result.json()["authorized_device_count"] is None
+    assert result.json()["recent_device_count"] is None
     assert "Sensitive" not in result.text
     assert "assistant-1" not in result.text
 

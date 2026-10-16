@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import uuid
 from zoneinfo import ZoneInfo
@@ -34,6 +35,50 @@ class ChatOrchestrator:
     def __init__(self):
         self._subscribers: Dict[str, List[asyncio.Queue]] = {}
         self._active_tasks: Dict[str, asyncio.Task] = {}
+
+    @staticmethod
+    def _proposal_id(user_id: str, turn_id: str) -> str:
+        return "prop-chat-" + hashlib.sha256((user_id + "\0" + turn_id).encode()).hexdigest()[:40]
+
+    @staticmethod
+    def _proposal_items_signature(items):
+        """Match legacy persisted items without inventing IDs or a timezone on replay."""
+        result = []
+        for raw in items:
+            item = raw if isinstance(raw, AgendaItemModel) else AgendaItemModel.model_validate(raw)
+            value = item.model_dump(mode="json")
+            for field in ("start_time", "end_time"):
+                instant = getattr(item, field)
+                value[field] = instant.replace(tzinfo=None).isoformat() if instant else None
+            result.append(value)
+        return result
+
+    async def _stored_turn_proposal(self, session, turn, assistant_content):
+        stored = await proposal_service.get_proposal(session, turn.user_id, self._proposal_id(turn.user_id, turn.id))
+        if stored is None and assistant_content and turn.completed_at:
+            # Older releases used random IDs. Recover only a unique, exact stored
+            # proposal from this turn's generation window, never a newly parsed ID.
+            parsed, _ = extract_proposal_from_text(assistant_content)
+            if parsed:
+                candidates = (await session.execute(select(Proposal).where(
+                    Proposal.user_id == turn.user_id,
+                    Proposal.created_at >= turn.created_at,
+                    Proposal.created_at <= turn.completed_at,
+                    Proposal.summary == parsed.summary,
+                    Proposal.reason == parsed.reason,
+                ).limit(11))).scalars().all()
+                signature = self._proposal_items_signature(parsed.resulting_items)
+                matches = [candidate for candidate in candidates
+                           if self._proposal_items_signature(candidate.resulting_items or []) == signature]
+                if len(candidates) <= 10 and len(matches) == 1:
+                    stored = matches[0]
+        if stored is None:
+            return None
+        return AgentProposalModel(
+            id=stored.id, summary=stored.summary, reason=stored.reason,
+            resulting_items=[AgendaItemModel.model_validate(item) for item in stored.resulting_items or []],
+            status=ProposalStatus(stored.status), created_at=stored.created_at,
+        )
 
     async def create_or_get_turn(
         self,
@@ -259,6 +304,7 @@ class ChatOrchestrator:
             if "```proposal" in full_response and (proposal is None or not proposal.resulting_items):
                 raise ValueError("No pude preparar un cambio válido. No se modificó la agenda; precisa el cambio e intenta de nuevo.")
             if proposal:
+                proposal = proposal.model_copy(update={"id": self._proposal_id(user_id, turn_id)})
                 # The model sees local clock times. Attach their zone before
                 # persistence so confirming a proposal cannot shift it six hours.
                 proposal = proposal.model_copy(update={'resulting_items': [
@@ -420,10 +466,7 @@ class ChatOrchestrator:
         asst_message = next((m for m in messages if m.role == "assistant"), None)
         asst_content = asst_message.content if asst_message else None
 
-        proposal_obj: Optional[AgentProposalModel] = None
-        if asst_content:
-            parsed_prop, _ = extract_proposal_from_text(asst_content)
-            proposal_obj = parsed_prop
+        proposal_obj = await self._stored_turn_proposal(session, turn, asst_content)
 
         return ChatTurnResponse(
             turn_id=turn.id,
