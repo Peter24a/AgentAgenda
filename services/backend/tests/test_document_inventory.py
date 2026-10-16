@@ -28,6 +28,8 @@ async def answer(s, message='¿Cuántos reconocimientos he obtenido?', recipient
 @pytest.mark.parametrize('message,keywords,compare', [
     ('¿Cuántos reconocimientos he obtenido?', ('reconocimiento',), True),
     ('Cuenta mis documentos', (), False),
+    ('Cuántos documentos con título agenda tengo', ('agenda',), False),
+    ('Puedes buscar mis documentos con título reconocimientos', ('reconocimiento',), False),
     ('Busca documentos por título que digan reconocimientos', ('reconocimiento',), False),
     ('¿Tengo reconocimientos repetidos?', ('reconocimiento',), True),
     ('Compara mis documentos duplicados', (), True),

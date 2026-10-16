@@ -45,7 +45,7 @@ def inventory_query(message):
     if not ((docs or awards) and (count or search or compare)):
         return None
     # Scheduling/mutation requests must keep their normal route.
-    if re.search(r'\b(?:agenda|programa|elimina|borra|revoca|autoriza)\b', text):
+    if re.match(r'(?:por favor[,]?\s+)?(?:agenda|programa|elimina|borra|revoca|autoriza)\b', text):
         return None
     quoted = re.search(r'["“«]([^"”»]+)["”»]', text)
     filler = set('por favor busca buscar lista listar enumera muestra muestrame cuales cual cuantos cuantas cuanto cuanta cantidad numero total cuenta contar de del el la los las un una unos unas mi mis tus sus tengo tienes hay he has obtenido obtenidos recibido recibidos conseguido conseguidos ganado ganados son es estan se que cuyo cuyos cuya cuyas titulo titulos nombre nombres documento documentos archivo archivos subido subidos subida subidas guardado guardados disponible disponibles biblioteca catalogo en con y o al para tambien puedes podrias dime saber quiero necesito cuantos cuantas obtuve revisa revisar compara comparar repetido repetidos repetida repetidas duplicado duplicados duplicada duplicadas distinto distintos unica unicas unico unicos sin realmente exactamente dicen dice diga digan contiene contienen incluya incluyan llamados llamadas llamado llamada todos todas'.split())
