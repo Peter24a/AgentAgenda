@@ -193,8 +193,22 @@
   .metadata { display: grid; gap: 20px; grid-template-columns: repeat(3, 1fr); margin: 24px 0; }
   .metadata dt { color: var(--muted); font-size: 11px; margin-bottom: 5px; }
   .metadata dd { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
-  .invitation-reference { display: block; margin-top: 4px; }
-  .detail-grid + .panel { margin-top: 21px; }
+  .invitation-reference { display: block; margin-top: 5px; font-size: 11px; }
+  .invitation-history { border-top: 1px solid var(--line); margin-top: 24px; padding-top: 22px; }
+  .invitation-history-heading, .invitation-item-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .invitation-history-heading h3 { margin: 0; font-size: 16px; }
+  .invitation-history-heading small { font-size: 11px; }
+  .invitation-history-copy { margin: 9px 0 12px; font-size: 12px; }
+  .invitation-scroll { max-height: 320px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; border: 1px solid var(--line); border-radius: 10px; padding: 0 14px; }
+  .invitation-scroll:focus-visible { outline: 2px solid var(--action); outline-offset: 3px; }
+  .invitation-list { list-style: none; margin: 0; padding: 0; }
+  .invitation-item { padding: 15px 0; border-bottom: 1px solid var(--line); }
+  .invitation-item:last-child { border-bottom: 0; }
+  .invitation-item-heading strong { font-size: 13px; }
+  .invitation-item-heading .badge { flex-shrink: 0; }
+  .invitation-dates { display: grid; grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); gap: 10px 15px; margin: 12px 0 0; }
+  .invitation-dates dt { color: var(--muted); font-size: 10px; margin-bottom: 3px; }
+  .invitation-dates dd { margin: 0; font-size: 11px; }
   .detail-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 21px; }
   .detail-actions { margin-top: 22px; display: flex; gap: 9px; flex-wrap: wrap; }
   .operation { display: flex; gap: 12px; align-items: flex-start; padding: 16px 0; border-bottom: 1px solid var(--line); }

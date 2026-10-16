@@ -161,12 +161,17 @@ function shell(mode, active, contentNode) {
 }
 
 async function showAdmin(screen = 'spaces', spaceId = null) {
-  const epoch = startScreen(); state.screen = screen; document.title = 'Administración · AgentAgenda';
-  const area = el('div', {}, loading()); shell('admin', screen === 'detail' ? 'spaces' : screen, area);
+  const previousHistory = state.screen === 'detail' && screen === 'detail' && state.adminSpaceId === spaceId ? document.querySelector('.invitation-scroll') : null;
+  const historyScroll = previousHistory?.scrollTop || 0;
+  const pageScroll = previousHistory ? window.scrollY : null;
+  const historyFocused = previousHistory === document.activeElement;
+  const epoch = startScreen(); state.screen = screen; state.adminSpaceId = spaceId; document.title = 'Administración · AgentAgenda';
+  const area = previousHistory ? document.querySelector('#admin-area') : el('div', {id: 'admin-area'}, loading());
+  if (!previousHistory) shell('admin', screen === 'detail' ? 'spaces' : screen, area);
   try {
     if (screen === 'spaces') { const result = await control('/spaces'); if (epoch !== state.epoch) return; state.spaces = result.spaces || []; renderSpaces(area); }
     else if (screen === 'operations') { const result = await control('/operations'); if (epoch !== state.epoch) return; state.operations = result.operations || []; renderOperations(area); }
-    else { const [space, result] = await Promise.all([control(`/spaces/${encodeURIComponent(spaceId)}`), control('/operations')]); if (epoch !== state.epoch) return; renderSpaceDetail(area, space, (result.operations || []).filter(operation => operation.space_id === space.id)); }
+    else { const [space, result] = await Promise.all([control(`/spaces/${encodeURIComponent(spaceId)}`), control('/operations')]); if (epoch !== state.epoch) return; renderSpaceDetail(area, space, (result.operations || []).filter(operation => operation.space_id === space.id)); const history = area.querySelector('.invitation-scroll'); if (history) { history.scrollTop = historyScroll; if (historyFocused) history.focus({preventScroll: true}); } if (pageScroll !== null) window.scrollTo(0, pageScroll); }
     const running = screen === 'spaces' ? state.spaces.some(space => ['provisioning', 'closing'].includes(space.state)) : screen === 'operations' ? state.operations.some(operation => ['queued', 'running', 'pending'].includes(operation.state)) : Boolean(area.querySelector('[data-poll]'));
     if (running || screen === 'detail') {
       const refresh = () => { if (epoch !== state.epoch) return; if (document.querySelector('dialog')) { state.timer = setTimeout(refresh, 4000); return; } showAdmin(screen, spaceId); };
@@ -197,26 +202,28 @@ function renderSpaceDetail(area, space, operations) {
   else if (space.state === 'suspended') lifecycle.append(button('Reactivar', () => confirmLifecycle(space, 'resume'), '', 'refresh'), button('Cerrar espacio', () => confirmLifecycle(space, 'close'), 'ghost'));
   else if (space.state === 'closed') lifecycle.append(button('Reabrir espacio', () => confirmLifecycle(space, 'reopen'), 'secondary', 'refresh'));
   else if (space.state === 'failed') lifecycle.append(button('Reintentar preparación', () => confirmLifecycle(space, 'retry'), 'secondary', 'refresh'));
-  const access = el('div', {}, el('p', {class: 'muted'}, 'Entrega un código temporal para activar un dispositivo nuevo o recuperar acceso al mismo espacio.'), el('div', {class: 'detail-actions'}, button('Activar dispositivo', () => createActivation(space, 'enroll'), '', 'plus'), button('Código de reconexión', () => createActivation(space, 'reconnect'), 'secondary', 'refresh')), notice('Verifica la identidad del propietario antes de entregar un código de reconexión.'), el('p', {class: 'retention'}, 'El código completo se muestra sólo al generarlo. Su estado queda en el historial; generar otro reemplaza el anterior que siga disponible.'));
+  const access = el('div', {}, el('p', {class: 'muted'}, 'Entrega un código temporal para activar un dispositivo nuevo o recuperar acceso al mismo espacio.'), el('div', {class: 'detail-actions'}, button('Activar dispositivo', () => createActivation(space, 'enroll'), '', 'plus'), button('Código de reconexión', () => createActivation(space, 'reconnect'), 'secondary', 'refresh')), notice('Verifica la identidad del propietario antes de entregar un código de reconexión.'), el('p', {class: 'retention'}, 'El código completo se muestra sólo al generarlo. Generar otro reemplaza el anterior que siga disponible.'), invitationHistory(space.invitations || []));
   access.querySelectorAll('button').forEach(node => { node.disabled = space.state !== 'ready'; });
   const statePanel = el('div', {}, metadata([['Propietario', space.owner_name], ['Estado', statusBadge(space.state)], ['Salud del servicio', statusBadge(space.health === 'ready' ? 'healthy' : space.health === 'unavailable' ? 'offline' : space.health || 'Sin medición')], ['Dispositivos con acceso vigente', Number.isInteger(space.authorized_device_count) ? String(space.authorized_device_count) : 'Sin medición'], ['Con actividad en los últimos 15 minutos', Number.isInteger(space.recent_device_count) ? String(space.recent_device_count) : 'Sin medición'], ['Reportes de IA por atender', Number.isInteger(space.pending_ai_reports) ? String(space.pending_ai_reports) : 'Sin medición'], ['Archivos almacenados', formatBytes(space.usage_bytes)], ['Límite efectivo de archivos', formatBytes(quota)], ['Creado', dateTime(space.created_at)], ['Última actualización', dateTime(space.updated_at)], ['Identificador', space.id]]), el('p', {class: 'muted'}, 'El conteo incluye app y navegador con acceso vigente. La actividad reciente indica uso en los últimos 15 minutos; no confirma conexión en este instante.'), consumption, lifecycle, el('p', {class: 'retention'}, 'Suspender bloquea el servicio y conserva los datos. Cerrar también bloquea el acceso y conserva sus recursos para una posible reapertura.'));
-  area.replaceChildren(button('Todos los espacios', () => showAdmin(), 'ghost small back-button', 'back'), pageHeader('ESPACIO PERSONAL', space.name, 'Administración del acceso y los recursos del servicio.', button('Actualizar', () => showAdmin('detail', space.id), 'secondary', 'refresh')), el('div', {class: 'detail-grid'}, panel('Estado del espacio', statePanel), panel('Acceso del propietario', access)), invitationHistory(space.invitations || []), el('div', {class: 'stack'}, el('div', {}, ''), panel('Operaciones', operations.length ? el('div', {'data-poll': running ? '' : null}, operations.map(operationNode)) : empty('Sin operaciones registradas', 'Los cambios en este espacio aparecerán aquí.', 'activity'))));
+  area.replaceChildren(button('Todos los espacios', () => showAdmin(), 'ghost small back-button', 'back'), pageHeader('ESPACIO PERSONAL', space.name, 'Administración del acceso y los recursos del servicio.', button('Actualizar', () => showAdmin('detail', space.id), 'secondary', 'refresh')), el('div', {class: 'detail-grid'}, panel('Estado del espacio', statePanel), panel('Acceso del propietario', access)), el('div', {class: 'stack'}, el('div', {}, ''), panel('Operaciones', operations.length ? el('div', {'data-poll': running ? '' : null}, operations.map(operationNode)) : empty('Sin operaciones registradas', 'Los cambios en este espacio aparecerán aquí.', 'activity'))));
 }
 
 
 function invitationHistory(invitations) {
-  const rows = invitations.map(invitation => el('tr', {},
-    el('td', {}, invitation.purpose === 'reconnect' ? 'Reconexión' : 'Activación', el('small', {class: 'muted invitation-reference', title: invitation.id}, `Referencia: ${invitation.id.slice(0, 8)}`)),
-    el('td', {}, statusBadge(invitation.status)),
-    el('td', {}, dateTime(invitation.created_at)),
-    el('td', {}, dateTime(invitation.expires_at)),
-    el('td', {}, dateTime(invitation.completed_at))));
-  return panel('Historial de códigos', el('div', {class: 'stack'},
-    el('p', {class: 'muted'}, 'Últimos 100 códigos de un solo uso. Se actualiza cada 15 segundos. «Usado» confirma que terminó la activación; «Activación en curso» indica un intento reservado que todavía puede reintentarse.'),
-    rows.length ? el('div', {class: 'table-wrap'}, el('table', {},
-      el('thead', {}, el('tr', {}, ['Tipo / referencia', 'Estado', 'Generado', 'Vencimiento', 'Usado'].map(title => el('th', {scope: 'col'}, title)))),
-      el('tbody', {}, rows))) : el('p', {class: 'muted'}, 'Todavía no hay códigos registrados.')));
+  const items = invitations.map((invitation, index) => el('li', {class: 'invitation-item'},
+    el('div', {class: 'invitation-item-heading'}, el('strong', {}, invitation.purpose === 'reconnect' ? 'Reconexión' : 'Activación'), statusBadge(invitation.status)),
+    el('small', {class: 'muted invitation-reference', title: invitation.id}, `${index === 0 ? 'Más reciente · ' : ''}Referencia: ${invitation.id.slice(0, 8)}`),
+    el('dl', {class: 'invitation-dates'},
+      el('div', {}, el('dt', {}, 'Generado'), el('dd', {}, dateTime(invitation.created_at))),
+      el('div', {}, el('dt', {}, 'Vencimiento'), el('dd', {}, dateTime(invitation.expires_at))),
+      invitation.completed_at && el('div', {}, el('dt', {}, 'Usado'), el('dd', {}, dateTime(invitation.completed_at)))),
+    invitation.status === 'processing' && el('small', {class: 'muted'}, 'La activación comenzó y todavía no termina.')));
+  return el('section', {class: 'invitation-history', 'aria-labelledby': 'invitation-history-title'},
+    el('div', {class: 'invitation-history-heading'}, el('h3', {id: 'invitation-history-title'}, 'Historial de códigos'), el('small', {class: 'muted'}, `${invitations.length} registros`)),
+    el('p', {class: 'muted invitation-history-copy'}, 'Los más recientes primero. Se actualiza cada 15 segundos.'),
+    items.length ? el('div', {class: 'invitation-scroll', role: 'region', 'aria-label': 'Lista desplazable de códigos', tabindex: 0}, el('ol', {class: 'invitation-list'}, items)) : el('p', {class: 'muted'}, 'Todavía no hay códigos registrados.'));
 }
+
 
 function dialog(title, body) {
   const node = el('dialog', {class: 'dialog', 'aria-label': title}, el('div', {class: 'dialog-head'}, el('h2', {}, title), iconButton('close', 'Cerrar ventana', () => node.close())), el('div', {class: 'dialog-body'}, body));

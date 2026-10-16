@@ -8,6 +8,8 @@ El panel administrativo usa `/control/v1` y una sesión independiente. El dashbo
 
 Incluye altas y progreso de preparación, códigos temporales, suspensión y reapertura; agenda con edición y tareas; conversación durable con SSE y confirmación de propuestas; catálogo, carga por bloques y búsqueda documental; autorización y revocación de dispositivos.
 
+El detalle administrativo integra el historial de códigos debajo de los controles de acceso del propietario. La lista tiene desplazamiento propio, muestra primero los códigos recientes y conserva su posición durante las actualizaciones del mismo espacio. Sus estados, referencias y fechas se mantienen visibles sin mostrar los códigos completos.
+
 Los enlaces de archivos recibidos del asistente se validan y resuelven dentro del espacio actual. Las respuestas y nombres se muestran con nodos de texto; no se evalúa HTML del servidor. Al terminar el streaming, se recupera el turno durable para completar cualquier token producido antes de la suscripción.
 
 Comprobaciones locales:
