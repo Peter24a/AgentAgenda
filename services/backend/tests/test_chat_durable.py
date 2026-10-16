@@ -92,7 +92,7 @@ async def test_turn_generation_and_sse_streaming(client, auth_headers):
         # Crear turno que dispara propuesta
         create_res = await client.post(
             "/v1/chat/turns",
-            json={"message": "Agenda una reunión mañana a las 3pm", "client_message_id": "client-meet-01"},
+            json={"message": "Agenda una reunión mañana de 15:00 a 16:00", "client_message_id": "client-meet-01"},
             headers=auth_headers,
         )
         turn_id = create_res.json()["turn_id"]
@@ -121,7 +121,7 @@ async def test_turn_generation_and_sse_streaming(client, auth_headers):
         assert done_data["status"] == "completed"
         assert done_data["assistant_message"] is not None
         assert done_data["proposal"] is not None
-        assert done_data["proposal"]["summary"] == "Reunión de prueba"
+        assert done_data["proposal"]["summary"].startswith("Agendar: Reunión de prueba")
 
 
 @pytest.mark.asyncio
@@ -136,11 +136,10 @@ async def test_client_disconnect_preserves_durable_persistence(client, auth_head
 
         # El cliente NO abre o corta de inmediato el stream SSE...
         # Esperamos a que el orquestador termine la generación en segundo plano
-        for _ in range(50):
-            await asyncio.sleep(0.05)
-            check_res = await client.get(f"/v1/chat/turns/{turn_id}", headers=auth_headers)
-            if check_res.json()["status"] == "completed":
-                break
+        from app.services.chat_orchestrator import chat_orchestrator
+        task = chat_orchestrator._active_tasks.get(turn_id)
+        if task:
+            await asyncio.wait_for(asyncio.shield(task), timeout=10)
 
         final_turn = await client.get(f"/v1/chat/turns/{turn_id}", headers=auth_headers)
         assert final_turn.json()["status"] == "completed"
@@ -223,7 +222,7 @@ async def test_recovered_and_replayed_chat_proposal_remains_confirmable(client, 
     import json
     from app.services.chat_orchestrator import ChatOrchestrator
     with patch('app.services.chat_orchestrator.stream_chat_completion', side_effect=mock_stream_chat_completion):
-        payload = {'message': 'Agenda una reunión', 'client_message_id': 'recover-confirmable', 'timezone': 'America/Mexico_City'}
+        payload = {'message': 'Agenda una reunión el 2026-09-15 de 15:00 a 16:00', 'client_message_id': 'recover-confirmable', 'timezone': 'America/Mexico_City'}
         created = (await client.post('/v1/chat/turns', json=payload, headers=auth_headers)).json()
         turn_id = created['turn_id']
         stream = await client.get(f'/v1/chat/turns/{turn_id}/stream', headers=auth_headers)
@@ -244,8 +243,9 @@ async def test_recovered_and_replayed_chat_proposal_remains_confirmable(client, 
         assert recovered['proposal']['status'] == 'accepted'
         assert recovered['proposal']['id'] == streamed['id']
         agenda = (await client.get('/v1/agenda/events?date=2026-09-15', headers=auth_headers)).json()
-        assert len([item for item in agenda if item['id'] == 'evt-mock-01']) == 1
-        assert next(item for item in agenda if item['id'] == 'evt-mock-01')['start_time'].startswith('2026-09-15T21:00:00')
+        event_id = streamed['resulting_items'][0]['id']
+        assert len([item for item in agenda if item['id'] == event_id]) == 1
+        assert next(item for item in agenda if item['id'] == event_id)['start_time'].startswith('2026-09-15T21:00:00')
 
 
 @pytest.mark.asyncio

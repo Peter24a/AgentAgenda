@@ -68,10 +68,11 @@ class MemoryService:
         req: MemorySearchRequest,
         *,
         for_model: bool = False,
+        recipient_id: Optional[str] = None,
     ) -> Tuple[List[Memory], int]:
         filters = [Memory.user_id == user_id]
         if for_model:
-            filters.extend([Memory.status == "active", memory_source_visibility(user_id)])
+            filters.extend([Memory.status == "active", memory_source_visibility(user_id, recipient_id)])
 
         if req.status and req.status.lower() != "all":
             filters.append(Memory.status == req.status.lower())

@@ -4,8 +4,9 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel, Field
 
-from app.api.deps import get_db_session, require_scope
+from app.api.deps import get_db_session, get_explicit_auth, has_scope, require_scope
 from app.models.auth import AuthContext
 from app.models.document import (
     DocumentListResponse,
@@ -20,6 +21,46 @@ from app.services.document_storage import document_storage
 router = APIRouter(prefix="/v1/documents", tags=["documents"])
 
 
+class ContextAccessRequest(BaseModel):
+    revision_id: str = Field(..., min_length=1, max_length=64)
+    authorized: bool
+
+
+def _context_scope(auth: AuthContext, write=False):
+    if not has_scope(auth, "documents:read") or (write and not has_scope(auth, "documents:write")):
+        raise HTTPException(status_code=403, detail="Permisos documentales insuficientes.")
+
+
+@router.get("/{id}/context-access", summary="Consultar permiso de análisis para este dispositivo")
+async def get_context_access(
+    id: str,
+    session: AsyncSession = Depends(get_db_session),
+    auth: AuthContext = Depends(get_explicit_auth),
+):
+    from app.services.document_consent import context_access_state, DocumentConsentError
+    _context_scope(auth)
+    try:
+        return await context_access_state(session, auth.user_id, auth.device_id, id)
+    except DocumentConsentError as error:
+        raise HTTPException(status_code=error.status_code, detail=str(error))
+
+
+@router.put("/{id}/context-access", summary="Autorizar o revocar una revisión para este dispositivo")
+async def update_context_access(
+    id: str,
+    req: ContextAccessRequest,
+    session: AsyncSession = Depends(get_db_session),
+    auth: AuthContext = Depends(get_explicit_auth),
+):
+    from app.services.document_consent import set_context_access, DocumentConsentError
+    _context_scope(auth, write=True)
+    try:
+        return await set_context_access(session, auth.user_id, auth.device_id, id,
+                                        req.revision_id, req.authorized)
+    except DocumentConsentError as error:
+        raise HTTPException(status_code=error.status_code, detail=str(error))
+
+
 @router.get("/search", summary="Buscar fragmentos documentales con procedencia")
 async def search_document_content(
     q: str = Query(..., min_length=2, max_length=500),
@@ -28,7 +69,10 @@ async def search_document_content(
     auth: AuthContext = Depends(require_scope("documents:read")),
 ):
     from app.services.document_retrieval import search_documents
-    return {"results": await search_documents(session, auth.user_id, q, limit=limit)}
+    return {"results": await search_documents(
+        session, auth.user_id, q, limit=limit,
+        recipient_id=f"device:{auth.device_id}" if auth.device_id else None,
+    )}
 
 
 @router.post(

@@ -3,15 +3,15 @@ import hashlib
 import json
 import uuid
 from zoneinfo import ZoneInfo
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import AsyncGenerator, Dict, List, Optional, Tuple
 
-from sqlalchemy import select, func, or_, exists
+from sqlalchemy import select, func, or_, exists, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_context
 from app.models.agenda import ActivityCategory, AgendaItemModel
-from app.models.canonical import ChatMessage, ChatTurn, Event, Proposal, Memory, Document
+from app.models.canonical import ChatMessage, ChatTurn, Event, Proposal, Memory, Document, DocumentContextGrant, ProposalContext
 from app.models.chat import (
     ChatMessageModel,
     ChatMessageResponse,
@@ -29,6 +29,8 @@ from app.services.proposal_parser import extract_proposal_from_text
 from app.services.proposal_service import proposal_service
 from app.services.context_engine import context_engine
 from app.services.file_delivery import file_delivery_response
+from app.services.agenda_intent import prepare_agenda_intent, constrain_proposal, remember_agenda_clarification
+from app.services.document_consent import handle_document_consent
 
 
 class ChatOrchestrator:
@@ -39,6 +41,23 @@ class ChatOrchestrator:
     @staticmethod
     def _proposal_id(user_id: str, turn_id: str) -> str:
         return "prop-chat-" + hashlib.sha256((user_id + "\0" + turn_id).encode()).hexdigest()[:40]
+
+    @staticmethod
+    def _proposal_text(proposal, zone):
+        days = ('lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo')
+        lines = ['Revisa esta propuesta; sólo se aplicará cuando la confirmes.']
+        if proposal.routine:
+            routine = proposal.routine
+            until = f'hasta {routine.ends_on}' if routine.ends_on else 'sin fecha de fin'
+            lines.append(f'Rutina semanal desde {routine.starts_on}, {until}. Se mantendrá automáticamente; estas son las próximas sesiones.')
+        for item in proposal.resulting_items:
+            start = item.start_time.astimezone(zone) if item.start_time.tzinfo else item.start_time.replace(tzinfo=zone)
+            end = item.end_time.astimezone(zone) if item.end_time and item.end_time.tzinfo else item.end_time
+            action = 'Cancelar' if item.action == 'delete' else 'Agendar/ajustar'
+            lines.append(f'- {action} «{item.title}»: {days[start.weekday()]} {start:%d/%m/%Y}, {start:%H:%M}' + (f'–{end:%H:%M}' if end else '') + '.')
+        data = {'summary': proposal.summary, 'reason': proposal.reason,
+                'items': [item.model_dump(mode='json') for item in proposal.resulting_items]}
+        return '\n'.join(lines) + '\n\n```proposal\n' + json.dumps(data, ensure_ascii=False) + '\n```'
 
     @staticmethod
     def _proposal_items_signature(items):
@@ -74,10 +93,12 @@ class ChatOrchestrator:
                     stored = matches[0]
         if stored is None:
             return None
+        metadata = await session.get(ProposalContext, stored.id)
         return AgentProposalModel(
             id=stored.id, summary=stored.summary, reason=stored.reason,
             resulting_items=[AgendaItemModel.model_validate(item) for item in stored.resulting_items or []],
             status=ProposalStatus(stored.status), created_at=stored.created_at,
+            routine=metadata.payload.get('routine') if metadata and metadata.user_id == turn.user_id else None,
         )
 
     async def create_or_get_turn(
@@ -88,9 +109,16 @@ class ChatOrchestrator:
         req: CreateTurnRequest,
         allow_document_context: bool = True,
         allow_memory_context: bool = True,
+        allow_document_consent: bool = True,
     ) -> Tuple[ChatTurnResponse, bool]:
         """Crea un turno de chat durable o recupera el existente si coincide el client_message_id."""
         now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        # Serialize creation for an owner: concurrent retries must see the first
+        # committed turn even on clients which supply an idempotency key.
+        if session.bind and session.bind.dialect.name == "postgresql":
+            lock = int.from_bytes(hashlib.sha256(("chat-create\0" + user_id).encode()).digest()[:8], "big", signed=True)
+            await session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": lock})
 
         # Idempotencia: si ya existe client_message_id, retornar el turno existente
         if req.client_message_id:
@@ -139,6 +167,7 @@ class ChatOrchestrator:
                 context_recipient=f"device:{device_id}" if device_id else None,
                 allow_document_context=allow_document_context,
                 allow_memory_context=allow_memory_context,
+                allow_document_consent=allow_document_consent,
             )
         )
         self._active_tasks[turn_id] = task
@@ -163,6 +192,7 @@ class ChatOrchestrator:
         context_recipient: Optional[str] = None,
         allow_document_context: bool = True,
         allow_memory_context: bool = True,
+        allow_document_consent: bool = True,
     ):
         """Ejecuta la generación en segundo plano sin depender del ciclo de vida del socket HTTP."""
         try:
@@ -185,12 +215,51 @@ class ChatOrchestrator:
 
             # 2. Ensamblar contexto de agenda y conversación reciente
             async with get_db_context() as session:
+                user_msg_obj = await session.scalar(select(ChatMessage).where(
+                    ChatMessage.turn_id == turn_id, ChatMessage.user_id == user_id,
+                    ChatMessage.role == "user",
+                ))
+                user_message_text = user_msg_obj.content if user_msg_obj else ""
+                recipient_device = context_recipient.removeprefix('device:') if context_recipient else None
+                file_response = (await file_delivery_response(session, user_id, user_message_text)
+                                 if allow_document_context else None)
+                document_id = None
+                if allow_document_context and file_response is None:
+                    consent = await handle_document_consent(
+                        session, user_id, recipient_device, user_message_text,
+                        can_authorize=allow_document_consent,
+                    )
+                    file_response = consent.reply
+                    user_message_text = consent.retrieval_query or user_message_text
+                    document_id = consent.authorized_document_id
+                plan = None
+                if file_response is None:
+                    plan = await prepare_agenda_intent(
+                        session, user_id, recipient_device, user_message_text,
+                        now=datetime.now(local_zone), view_date=date.fromisoformat(target_date),
+                    )
+                    file_response = plan.reply
+                    user_message_text = plan.effective_message
+                    await session.commit()
                 events = await agenda_service.list_events(
                     session=session,
                     user_id=user_id,
-                    date=target_date,
+                    start_date=plan.start_date.isoformat() if plan else target_date,
+                    end_date=plan.end_date.isoformat() if plan else target_date,
                     timezone=iana_timezone,
                 )
+                if plan and plan.operation in ('update', 'delete'):
+                    # Include source commitments as well as the destination
+                    # dates, e.g. "move today's appointment to next Tuesday".
+                    keyed = {event.id: event for event in events}
+                    for anchor in {date.fromisoformat(target_date), datetime.now(local_zone).date()}:
+                        monday = anchor - timedelta(days=anchor.weekday())
+                        source_events = await agenda_service.list_events(
+                            session, user_id, start_date=monday.isoformat(),
+                            end_date=(monday + timedelta(days=6)).isoformat(), timezone=iana_timezone,
+                        )
+                        keyed.update((event.id, event) for event in source_events)
+                    events = list(keyed.values())
                 agenda_models = [
                     AgendaItemModel(
                         id=e.id,
@@ -216,11 +285,18 @@ class ChatOrchestrator:
                 document_barrier = await session.scalar(select(func.max(Document.updated_at)).where(
                     Document.user_id == user_id, Document.is_deleted.is_(True),
                 ))
-                barriers = [v for v in (memory_barrier, document_barrier) if v]
+                grant_barrier = await session.scalar(select(func.max(DocumentContextGrant.revoked_at)).where(
+                    DocumentContextGrant.user_id == user_id,
+                    DocumentContextGrant.recipient_id == context_recipient,
+                ))
+                barriers = [v for v in (memory_barrier, document_barrier, grant_barrier) if v]
                 history_after = max(barriers) if barriers else None
+                has_document_grants = bool(await session.scalar(select(exists().where(
+                    DocumentContextGrant.user_id == user_id,
+                ))))
                 # Client history has no trusted provenance. After a revocation,
                 # rebuild from durable messages newer than the invalidation.
-                if explicit_history and history_after is None and allow_memory_context and allow_document_context:
+                if explicit_history and history_after is None and not has_document_grants and allow_memory_context and allow_document_context:
                     history_models = explicit_history
                 else:
                     history_filters = [ChatMessage.user_id == user_id]
@@ -237,7 +313,7 @@ class ChatOrchestrator:
                         select(ChatMessage)
                         .where(*history_filters)
                         .order_by(ChatMessage.created_at.desc())
-                        .limit(8)
+                        .limit(18)
                     )
                     recent_msgs = list(reversed(msg_res.scalars().all()))
                     # Excluir el mensaje actual del turno que acabamos de guardar
@@ -252,28 +328,20 @@ class ChatOrchestrator:
                             )
                         )
 
-                # Obtener el mensaje del usuario de este turno
-                user_msg_res = await session.execute(
-                    select(ChatMessage).where(
-                        ChatMessage.turn_id == turn_id, ChatMessage.role == "user"
-                    )
-                )
-                user_msg_obj = user_msg_res.scalar_one_or_none()
-                user_message_text = user_msg_obj.content if user_msg_obj else ""
-                file_response = (await file_delivery_response(session, user_id, user_message_text)
-                                 if allow_document_context else None)
                 memory_context = ''
                 if allow_memory_context and file_response is None:
                     recall = await context_engine.past_conversation_context(session, user_id, user_message_text, after=history_after, exclude_turn=turn_id)
                     memory_context = await context_engine.memory_context(
                         session, user_id, query=user_message_text,
                         as_of=datetime.now(timezone.utc), token_budget=900 if recall else 1950,
+                        recipient_id=context_recipient,
                     )
                     if recall:
                         memory_context += "\n" + recall
                 if allow_document_context and file_response is None:
                     passages = await document_retrieval.search(
                         session, user_id, user_message_text, recipient_id=context_recipient,
+                        document_id=document_id, limit=10 if document_id else 5,
                     )
                     document_context = format_document_context(passages)
                 else:
@@ -287,6 +355,13 @@ class ChatOrchestrator:
                 document_context=document_context,
                 memory_context=memory_context,
                 current_time=datetime.now(local_zone).isoformat(timespec='minutes'),
+                agenda_period=(plan.start_date.isoformat(), plan.end_date.isoformat()) if plan else None,
+                resolved_schedule=({
+                    'dates': [day.isoformat() for day in plan.dates],
+                    'start_time': plan.start_clock.isoformat() if plan.start_clock else None,
+                    'end_time': plan.end_clock.isoformat() if plan.end_clock else None,
+                    'operation': plan.operation,
+                } if plan and plan.is_mutation and not plan.reply else None),
             )
 
             # 3. Stream de inferencia local
@@ -297,10 +372,12 @@ class ChatOrchestrator:
             else:
                 async for chunk in stream_chat_completion(llm_messages):
                     full_response += chunk
-                    await self._broadcast(turn_id, {"type": "token", "content": chunk})
+                    # Validate calendar actions before displaying model dates.
+                    if not (plan and plan.is_mutation):
+                        await self._broadcast(turn_id, {"type": "token", "content": chunk})
 
             # 4. Extraer posibles propuestas estructuradas
-            proposal, clean_text = extract_proposal_from_text(full_response)
+            proposal, clean_text = extract_proposal_from_text(full_response) if file_response is None else (None, full_response)
             if "```proposal" in full_response and (proposal is None or not proposal.resulting_items):
                 raise ValueError("No pude preparar un cambio válido. No se modificó la agenda; precisa el cambio e intenta de nuevo.")
             if proposal:
@@ -313,6 +390,100 @@ class ChatOrchestrator:
                         'end_time': (item.end_time if item.end_time.tzinfo else item.end_time.replace(tzinfo=local_zone)) if item.end_time else None,
                     }) for item in proposal.resulting_items
                 ]})
+                if plan and plan.is_mutation:
+                    proposal, clarification = constrain_proposal(plan, proposal)
+                    if clarification:
+                        full_response = clarification
+                    if proposal and plan.operation == 'delete':
+                        actual_by_id = {event.id: event for event in agenda_models}
+                        canonical_items = []
+                        for item in proposal.resulting_items:
+                            actual = actual_by_id.get(item.id)
+                            if actual is None or actual.start_time.astimezone(local_zone).date() not in plan.dates:
+                                proposal = None
+                                full_response = 'No identifiqué una actividad en la fecha que pediste cancelar. Indica su nombre, fecha y hora; no cambié tu agenda.'
+                                break
+                            actual_clock = actual.start_time.astimezone(local_zone).time().replace(tzinfo=None)
+                            if plan.start_clock is not None and actual_clock != plan.start_clock:
+                                proposal = None
+                                full_response = 'La actividad encontrada tiene otro horario. Indica cuál quieres cancelar; no cambié tu agenda.'
+                                break
+                            same_title = [event for event in agenda_models
+                                          if ' '.join(event.title.casefold().split()) == ' '.join(actual.title.casefold().split())
+                                          and event.start_time.astimezone(local_zone).date() == actual.start_time.astimezone(local_zone).date()
+                                          and (plan.start_clock is None or event.start_time.astimezone(local_zone).time().replace(tzinfo=None) == plan.start_clock)]
+                            if len(same_title) > 1:
+                                proposal = None
+                                full_response = 'Hay varias actividades con ese nombre en esa fecha. Indica la hora exacta de la que quieres cancelar; no cambié tu agenda.'
+                                break
+                            # The card must describe the exact existing row
+                            # that its ID will cancel, never model-supplied dates.
+                            canonical_items.append(actual.model_copy(update={'action': 'delete'}))
+                        if proposal and len(plan.dates) > 1:
+                            # A finite repeated cancellation covers every
+                            # requested date. One model template may not silently
+                            # reduce six requested cancellations to just one.
+                            titles = {' '.join(item.title.casefold().split()) for item in canonical_items}
+                            if len(titles) != 1:
+                                proposal = None
+                                full_response = 'Hay varias actividades distintas en la cancelación. Indica una actividad y las fechas que quieres cancelar; no cambié tu agenda.'
+                            else:
+                                selected_title = next(iter(titles))
+                                expanded_items = []
+                                for requested_date in plan.dates:
+                                    matches = [event for event in agenda_models
+                                               if ' '.join(event.title.casefold().split()) == selected_title
+                                               and event.start_time.astimezone(local_zone).date() == requested_date
+                                               and (plan.start_clock is None or event.start_time.astimezone(local_zone).time().replace(tzinfo=None) == plan.start_clock)]
+                                    if len(matches) != 1:
+                                        proposal = None
+                                        full_response = 'No encontré una única actividad con ese nombre en cada una de las fechas solicitadas. Precisa las fechas y horas que quieres cancelar; no preparé una cancelación parcial.'
+                                        break
+                                    expanded_items.append(matches[0].model_copy(update={'action': 'delete'}))
+                                canonical_items = expanded_items
+                        if proposal:
+                            proposal = proposal.model_copy(update={'resulting_items': canonical_items})
+                    if proposal and plan.operation == 'update' and any(
+                        item.id not in {event.id for event in agenda_models} for item in proposal.resulting_items
+                    ):
+                        proposal = None
+                        full_response = 'No identifiqué de forma inequívoca la actividad existente. Indica su nombre y fecha para modificarla sin crear otra.'
+                    if proposal and plan.recurrence and plan.operation == 'create':
+                        template = proposal.resulting_items[0]
+                        proposal = proposal_service.prepare_recurring_proposal(user_id, proposal, {
+                            'title': template.title, 'description': template.description,
+                            'category': template.category.value, 'timezone': local_zone.key,
+                            'starts_on': plan.recurrence['starts_on'], 'ends_on': plan.recurrence.get('ends_on'),
+                            'iso_weekdays': plan.recurrence['weekdays'],
+                            'start_time': plan.start_clock.strftime('%H:%M'), 'end_time': plan.end_clock.strftime('%H:%M'),
+                        })
+                    if proposal:
+                        async with get_db_context() as validation_session:
+                            try:
+                                proposal = await proposal_service.validate_proposal(validation_session, user_id, proposal)
+                            except ValueError as exc:
+                                proposal = None
+                                full_response = str(exc) + ' ¿Qué horario prefieres?'
+                    if proposal:
+                        item = proposal.resulting_items[0]
+                        action = 'Cancelar' if plan.operation == 'delete' else 'Mover' if plan.operation == 'update' else 'Agendar'
+                        label = ('Rutina semanal: ' if proposal.routine else action + ': ') + item.title
+                        if len(proposal.resulting_items) == 1:
+                            label += f' ({item.start_time:%d/%m/%Y})'
+                        proposal = proposal.model_copy(update={'summary': label[:256], 'reason': 'Fechas y horarios verificados para tu solicitud; pendiente de tu confirmación.'})
+                        full_response = self._proposal_text(proposal, local_zone)
+                    else:
+                        async with get_db_context() as clarification_session:
+                            await remember_agenda_clarification(
+                                clarification_session, user_id, recipient_device, plan, full_response,
+                                now=datetime.now(local_zone),
+                            )
+                            await clarification_session.commit()
+                else:
+                    proposal = None
+                    full_response = 'Para cambiar la agenda, indica la actividad, la fecha y el horario. Te mostraré una propuesta antes de aplicarla.'
+            if plan and plan.is_mutation and file_response is None:
+                await self._broadcast(turn_id, {"type": "token", "content": full_response})
             # Use only the complete records in the final budgeted source message.
             # This deterministic index remains available after the prompt is gone.
             source_appendix = (

@@ -203,6 +203,7 @@ class DocumentRetrievalService:
         *,
         limit: int = 5,
         recipient_id: Optional[str] = None,
+        document_id: Optional[str] = None,
     ) -> list[DocumentPassage]:
         query_weights = _query_weights(query)
         query_terms = set(query_weights)
@@ -210,7 +211,7 @@ class DocumentRetrievalService:
             r"\bcarrera\s+estudio\b|\b(?:carrera|formacion|educacion)\s+actual\b",
             normalize(query),
         ))
-        if not query_terms or limit <= 0:
+        if (not query_terms and not document_id) or limit <= 0:
             return []
 
         latest = aliased(DocumentRevision)
@@ -234,6 +235,8 @@ class DocumentRetrievalService:
             )
             .options(noload(Document.revisions), noload(DocumentRevision.document))
         )
+        if document_id:
+            stmt = stmt.where(Document.id == document_id)
         rows = (await session.execute(stmt)).all()
         # Count occurrence per document, so ubiquitous archive vocabulary cannot
         # beat the rarer terms that actually identify the requested information.
@@ -272,7 +275,7 @@ class DocumentRetrievalService:
                     continue
                 body_hits = query_terms & body_terms
                 heading_hits = query_terms & heading_terms
-                if not (body_hits or title_hits or heading_hits):
+                if not document_id and not (body_hits or title_hits or heading_hits):
                     continue
                 body_facets = facet_weights(body_hits)
                 title_facets = facet_weights(title_hits)
@@ -318,7 +321,7 @@ class DocumentRetrievalService:
         def include(candidate):
             passage, facets, _ = candidate
             key = normalize(passage.text).strip()
-            if key in seen_text or per_document.get(passage.document_id, 0) >= 2:
+            if key in seen_text or per_document.get(passage.document_id, 0) >= (limit if document_id else 2):
                 return False
             seen_text.add(key)
             result.append(passage)
@@ -483,7 +486,8 @@ async def search_documents(
     *,
     limit: int = 5,
     token_budget: int = 9000,
+    recipient_id: Optional[str] = None,
 ) -> list[dict]:
     """Return the same bounded evidence used by chat for API/CLI inspection."""
-    passages = await document_retrieval.search(session, user_id, query, limit=limit)
+    passages = await document_retrieval.search(session, user_id, query, limit=limit, recipient_id=recipient_id)
     return _bounded_evidence(passages, token_budget)

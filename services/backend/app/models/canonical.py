@@ -112,6 +112,27 @@ class ChatTurn(Base):
 
     messages = relationship("ChatMessage", back_populates="turn", cascade="all, delete-orphan", lazy="selectin")
 
+
+class ChatPendingAction(Base):
+    """Server-owned clarification, scoped to an owner and device; never model instructions."""
+    __tablename__ = "chat_pending_actions"
+    id = Column(String(64), primary_key=True)
+    user_id = Column(String(64), nullable=False, index=True)
+    device_id = Column(String(64), nullable=True)
+    kind = Column(String(32), nullable=False)
+    payload = Column(JSON, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class ProposalContext(Base):
+    """Optional server-side actions carried by a backwards-compatible agenda proposal."""
+    __tablename__ = "proposal_contexts"
+    id = Column(String(64), ForeignKey("proposals.id", ondelete="CASCADE"), primary_key=True)
+    user_id = Column(String(64), nullable=False, index=True)
+    payload = Column(JSON, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
     id = Column(String(64), primary_key=True)

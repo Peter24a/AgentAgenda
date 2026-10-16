@@ -110,6 +110,7 @@ async def create_chat_turn(
         req=req,
         allow_document_context=_can_read_documents(auth),
         allow_memory_context=_can_read_memory(auth),
+        allow_document_consent=has_scope(auth, "documents:write"),
     )
     return turn_response
 
@@ -274,6 +275,7 @@ async def chat_stream_legacy(
         req=turn_req,
         allow_document_context=_can_read_documents(auth),
         allow_memory_context=_can_read_memory(auth),
+        allow_document_consent=has_scope(auth, "documents:write"),
     )
 
     return StreamingResponse(
