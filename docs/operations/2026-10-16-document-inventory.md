@@ -37,3 +37,32 @@ NEVER_UPLOAD/eliminados, últimas versiones, metadatos sin lectura de texto,
 archivos idénticos, texto normalizado equivalente, plantillas parecidas de
 personas distintas, hashes inválidos, permisos por dispositivo/revisión,
 revocación, documentos sin versión y respuesta SSE de Android sin llamar al modelo.
+
+La revisión final agregó dos casos (23 pruebas específicas aprobadas) para
+buscar títulos que contienen «agenda» y formular la petición como «puedes
+buscar…». El total de 391 corresponde a la ejecución completa anterior a esos
+dos casos; no se suman ejecuciones solapadas.
+
+## Producción
+
+Release final `agentagenda-backend:document-inventory-20261016-r2`, código
+`527d9c8`. Backend y worker actualizados en los seis espacios, con respaldo
+cifrado, comprobación de hashes de fuentes, salud, autenticación SARA y
+conservación de contenedores PostgreSQL/configuración/volúmenes.
+Reversión privada:
+`/srv/agentagenda/recovery/deploy-document-inventory-20261016-r2/rollback.py`.
+
+**13/13 comprobaciones aprobadas en producción**, sobre el espacio sintético:
+activación, aislamiento entre espacios, 12 documentos originales subidos y
+extraídos, conteo completo a través del SSE de Android, ausencia de comparación
+sin permiso, comparación con permiso parcial, aislamiento entre dispositivos,
+revocación, agrupación de 11 copias equivalentes (10 adicionales), diferenciación
+de otro destinatario/folio como parecido sin confirmar, descarga del original,
+exclusión de eliminados y limpieza de fixtures/revocación de ambos dispositivos.
+Informe privado:
+`/srv/agentagenda/recovery/inventory-release-check-bd47e3bfc5.json`.
+
+Los archivos sintéticos se eliminaron lógicamente; no se afirma purga física.
+No se modificaron documentos personales, la app ni su instalación. El teléfono
+estaba bloqueado durante esta verificación; la comprobación de compatibilidad
+se realizó con el formato exacto del endpoint SSE de la aplicación instalada.
