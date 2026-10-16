@@ -58,5 +58,49 @@ imagen puede conservar estas tablas aditivas.
   revisión y elimina lógicamente sus fixtures/revoca el dispositivo al terminar.
 
 La interpretación de títulos y respuestas generales sigue dependiendo del
-modelo. No se afirma cobertura de toda formulación posible ni verificación en
-un teléfono físico; ante fechas o acciones no resueltas se solicita precisión.
+modelo. No se afirma cobertura de toda formulación posible; ante fechas o
+acciones no resueltas se solicita precisión.
+
+## Producción
+
+Publicado en backend y worker de los **seis espacios activos**, conservando sus
+contenedores PostgreSQL, volúmenes, puertos y configuración. Se verificaron los
+hashes de todas las fuentes dentro de cada imagen, salud y autenticación SARA.
+Release final: `agentagenda-backend:chat-planning-consent-20261016-r2`.
+
+La primera prueba publicada detectó que «14:30 hora de Ciudad de México» podía
+interpretarse como una duración. Se corrigió en `0eee8c1`, se añadieron tres
+regresiones y pasaron **101 pruebas específicas** de fechas y compatibilidad.
+El respaldo cifrado y reversión del release final están en
+`/srv/agentagenda/recovery/deploy-chat-planning-consent-20261016-r2/`.
+
+La repetición final completó **31/31 comprobaciones en producción**, incluyendo
+subida/extracción/descarga de PDF, DOCX y OCR, permiso por chat sin clasificación
+manual, hechos y citas reales, revocación, creación pendiente, confirmación y
+reintento, hora local, movimiento, rechazo, cancelación, viernes siguiente y
+rutina semanal confirmada sobre PostgreSQL. Informe privado:
+`/srv/agentagenda/recovery/planning-release-check-ab5e6437d8.json`.
+Se pausaron las rutinas sintéticas, se eliminaron lógicamente los archivos y
+eventos de comprobación y se revocó el dispositivo. No se afirma purga física.
+
+Una comprobación adicional del endpoint heredado `/v1/chat/stream`, con el
+cuerpo exacto de Android (`message`, `date`, `history`), pasó **4/4** controles:
+activación sintética, aislamiento entre espacios, respuesta SSE de aclaración
+sin propuesta y revocación del dispositivo. Informe privado:
+`/srv/agentagenda/recovery/planning-release-check-dd03c7c1e5.json`.
+
+## Teléfono físico con la aplicación oficial
+
+Se verificó por ADB el Pixel 10 Pro XL conectado por el propietario, con
+**AgentAgenda 2.0.3, versionCode 10**, instalada previamente. No se instaló,
+actualizó ni recompiló la aplicación.
+
+- «Agenda Prueba de compatibilidad del telefono» preguntó fecha, hora y duración.
+- «El 18 de abril de 2030 de 14:00 a 14:15» recuperó la aclaración y presentó la
+  tarjeta con fecha y horario correctos, pendiente de aprobación.
+- Se pulsó **Descartar**. Una consulta de solo lectura limitada a esa prueba
+  confirmó estado `rejected` y **cero eventos creados** con ese título.
+
+Esta prueba física cubre aclaración, continuidad del chat, presentación y rechazo
+de propuestas en la versión instalada. Las comprobaciones documentales y de
+rutinas descritas arriba se ejecutaron por API contra el espacio sintético.
