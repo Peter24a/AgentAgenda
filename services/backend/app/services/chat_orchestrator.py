@@ -30,6 +30,7 @@ from app.services.proposal_service import proposal_service
 from app.services.context_engine import context_engine
 from app.services.file_delivery import file_delivery_response
 from app.services.agenda_intent import prepare_agenda_intent, constrain_proposal, remember_agenda_clarification
+from app.services.document_inventory import inventory_response
 from app.services.document_consent import handle_document_consent
 
 
@@ -221,8 +222,10 @@ class ChatOrchestrator:
                 ))
                 user_message_text = user_msg_obj.content if user_msg_obj else ""
                 recipient_device = context_recipient.removeprefix('device:') if context_recipient else None
-                file_response = (await file_delivery_response(session, user_id, user_message_text)
+                file_response = (await inventory_response(session, user_id, context_recipient, user_message_text)
                                  if allow_document_context else None)
+                if allow_document_context and file_response is None:
+                    file_response = await file_delivery_response(session, user_id, user_message_text)
                 document_id = None
                 if allow_document_context and file_response is None:
                     consent = await handle_document_consent(
